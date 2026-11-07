@@ -76,6 +76,18 @@ def test_estado_ida_e_volta():
     assert estado_de_dict(estado_dict(e)) == e
 
 
+def test_relatorio_do_professor_aberto():
+    class AgenteAberto(AgenteFalso):
+        def __init__(self):
+            super().__init__()
+            self.uso = Uso("@cf/openai/gpt-oss-120b", entrada=20_000)  # US$ 0,007 por conversa
+
+    regs = rodar_lote(lote(PILOTO, 2), lambda c: (AgenteAberto(), ClienteFalso()), 100, 1)
+    texto = relatorio(regs)
+    assert "gpt-oss-120b" in texto and "Sonnet" not in texto
+    assert "estimativa para 2.000 conversas: US$ 14 (medido, @cf/openai/gpt-oss-120b)" in texto
+
+
 def test_relatorio():
     regs = rodar_lote(lote(PILOTO, 2), lambda c: (AgenteFalso(), ClienteFalso()), 100, 1)
     texto = relatorio(regs)

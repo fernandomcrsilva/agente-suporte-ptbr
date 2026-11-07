@@ -34,7 +34,8 @@ def contexto(c: Cenario) -> str:
 def rodar(c: Cenario, agente: Agente, cliente: Cliente, max_falas: int = 8,
           max_rodadas_ferramenta: int = 6) -> Conversa:
     sistema = Sistema(c)
-    fala = {"papel": "cliente", "texto": cliente.falar(None)}
+    # Se o cliente simulado já encerrar na abertura, a conversa começa com um pedido genérico de ajuda.
+    fala = {"papel": "cliente", "texto": cliente.falar(None) or "Oi, preciso de ajuda com um pedido."}
     eventos = [{"papel": "contexto", "texto": contexto(c)}, fala]
     entrada, falas, rodadas = list(eventos), 1, 0
 

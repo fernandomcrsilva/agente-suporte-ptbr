@@ -112,9 +112,12 @@ def relatorio(registros: list[dict]) -> str:
         *[f"  {tipo}: {d['resolvidos']}/{d['n']}" + (f", {d['erros_graves']} erro(s) grave(s)" if d["erros_graves"] else "")
           for tipo, d in sorted(s["por_tipo"].items())],
     ]
+    modelo = registros[0]["uso"]["agente"]["modelo"]
     for total in (1500, 2000):
-        linhas.append(f"estimativa para {_br(total, 0)} conversas: Opus 5.5 US$ {_br(total * (agente + cliente) / n, 0)} "
-                      f"(medido) | Sonnet 5.5 ~US$ {_br(total * sonnet / n, 0)} (estimativa: mesmos tokens a preço do Sonnet)")
+        linha = f"estimativa para {_br(total, 0)} conversas: US$ {_br(total * (agente + cliente) / n, 0)} (medido, {modelo})"
+        if modelo == "claude-opus-5-5":
+            linha += f" | Sonnet 5.5 ~US$ {_br(total * sonnet / n, 0)} (estimativa: mesmos tokens a preço do Sonnet)"
+        linhas.append(linha)
     linhas += [f"  {r['cenario']['id']}: {r['status']}: {r.get('erro', '')}" for r in registros if r["status"] != "ok"]
     return "\n".join(linhas)
 
@@ -125,6 +128,8 @@ def main():
     ap.add_argument("--inicio", type=int, default=PILOTO)
     ap.add_argument("--teto-dolares", type=float, default=10)
     ap.add_argument("--paralelo", type=int, default=4)
+    ap.add_argument("--professor", choices=("aberto", "claude"), default="aberto",
+                    help="aberto: gpt-oss no Workers AI, que pode gerar dados de treino; claude: só para medir")
     ap.add_argument("--saida", default=str(RAIZ / "runs" / "piloto"))
     ap.add_argument("--so-relatorio", action="store_true",
                     help="não chama a API: reavalia as conversas já salvas em --saida e refaz o relatório")
@@ -140,19 +145,26 @@ def main():
 
     from dotenv import load_dotenv
     load_dotenv(RAIZ / ".env")
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        sys.exit("Falta ANTHROPIC_API_KEY no arquivo .env na raiz do repositório.")
-    import anthropic
-    from claude import ClienteSimulado, Professor
-
-    api = anthropic.Anthropic(max_retries=4)
+    if args.professor == "claude":  # só para medir: saídas do Claude não podem treinar modelos (Política de Uso)
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            sys.exit("Falta ANTHROPIC_API_KEY no arquivo .env na raiz do repositório.")
+        import anthropic
+        from claude import ClienteSimulado, Professor
+        api = anthropic.Anthropic(max_retries=4)
+        fabrica = lambda c: (Professor(api), ClienteSimulado(api, c))  # noqa: E731
+    else:
+        faltam = [v for v in ("CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN") if not os.environ.get(v)]
+        if faltam:
+            sys.exit(f"Falta {' e '.join(faltam)} no arquivo .env na raiz do repositório.")
+        from aberto import ClienteAberto, ProfessorAberto, WorkersAI
+        api = WorkersAI(os.environ["CLOUDFLARE_ACCOUNT_ID"], os.environ["CLOUDFLARE_API_TOKEN"])
+        fabrica = lambda c: (ProfessorAberto(api), ClienteAberto(api, c))  # noqa: E731
     saida.mkdir(parents=True, exist_ok=True)
 
     def gravar(r):
         (saida / f"{r['cenario']['id']}.json").write_text(json.dumps(r, ensure_ascii=False, indent=1))
 
-    registros = rodar_lote(lote(args.inicio, args.n), lambda c: (Professor(api), ClienteSimulado(api, c)),
-                           args.teto_dolares, args.paralelo, ao_terminar=gravar)
+    registros = rodar_lote(lote(args.inicio, args.n), fabrica, args.teto_dolares, args.paralelo, ao_terminar=gravar)
     texto = relatorio(registros)
     (saida / "relatorio.txt").write_text(texto + "\n")
     print(texto)

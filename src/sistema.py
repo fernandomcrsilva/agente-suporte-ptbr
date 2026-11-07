@@ -48,6 +48,12 @@ def ferramentas_anthropic() -> list[dict]:
     return [{"name": n, "description": d, "input_schema": _schema(p), "strict": True} for n, d, _, p in _FERRAMENTAS]
 
 
+def ferramentas_openai() -> list[dict]:
+    """Formato de funções da OpenAI, com as descrições longas, para o professor aberto."""
+    return [{"type": "function", "function": {"name": n, "description": d, "parameters": _schema(p)}}
+            for n, d, _, p in _FERRAMENTAS]
+
+
 def ferramentas_qwen() -> list[dict]:
     return [{"type": "function", "function": {"name": n, "description": curta, "parameters": _schema(p)}}
             for n, _, curta, p in _FERRAMENTAS]

@@ -81,6 +81,11 @@ def test_estado_e_bloqueios_vem_do_sistema():
     assert len(conv.bloqueios) == 1 and not conv.estado.cupons
 
 
+def test_abertura_vazia_vira_mensagem_padrao():
+    conv = rodar(C, AgenteRoteiro([texto("Oi!")]), ClienteRoteiro([]))
+    assert conv.eventos[1] == {"papel": "cliente", "texto": "Oi, preciso de ajuda com um pedido."}
+
+
 def test_recusa_sobe():
     with pytest.raises(Recusa):
         rodar(C, AgenteRoteiro([Recusa("cyber")]), ClienteRoteiro(["oi"]))
