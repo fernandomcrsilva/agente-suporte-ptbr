@@ -1,6 +1,6 @@
 import pytest
 
-from formato_qwen import INICIO_AGENTE, PROMPT_ALUNO, corpo, prompt_geracao, prompt_sistema, renderizar
+from formato_qwen import INICIO_AGENTE, PROMPT_ALUNO, corpo, interpretar, prompt_geracao, prompt_sistema, renderizar
 from sistema import NOMES
 
 
@@ -68,3 +68,44 @@ def test_acentos_sem_escape(tok):
 def test_prompt_geracao_termina_no_inicio_do_agente(tok):
     texto = tok.decode(prompt_geracao(EVENTOS[:2], tok))
     assert texto.endswith("cadê meu pedido?<|im_end|>\n" + INICIO_AGENTE)
+
+
+def test_interpreta_texto_puro():
+    assert interpretar("Oi!<|im_end|>lixo depois", "q") == {"texto": "Oi!", "chamadas": []}
+
+
+def test_interpreta_duas_chamadas():
+    saida = ('<tool_call>\n{"name": "listar_pedidos", "arguments": {}}\n</tool_call>\n'
+             '<tool_call>\n{"name": "rastrear_entrega", "arguments": {"pedido_id": "P1"}}\n</tool_call><|im_end|>')
+    assert interpretar(saida, "q") == {"texto": "", "chamadas": [
+        {"id": "q0", "nome": "listar_pedidos", "args": {}},
+        {"id": "q1", "nome": "rastrear_entrega", "args": {"pedido_id": "P1"}}]}
+
+
+def test_chamada_sem_fechamento():
+    r = interpretar('Vou ver.\n<tool_call>\n{"name": "listar_pedidos", "arguments": {}}', "x")
+    assert r == {"texto": "Vou ver.", "chamadas": [{"id": "x0", "nome": "listar_pedidos", "args": {}}]}
+
+
+def test_think_perdido_some():
+    assert interpretar("<think>\nhmm\n</think>\n\nOlá!<|im_end|>", "q")["texto"] == "Olá!"
+
+
+def test_json_invalido_vira_chamada_invalida():
+    r = interpretar("<tool_call>\n{nome: errado\n</tool_call>", "q")
+    assert r["chamadas"] == [{"id": "q0", "nome": "_invalida", "args": {"_argumentos_invalidos": "{nome: errado"}}]
+
+
+def test_ida_e_volta_com_corpo():
+    for e in EVENTOS:
+        if e["papel"] == "agente":
+            r = interpretar(corpo(e) + "<|im_end|>", "x")
+            assert r["texto"] == e["texto"].strip()
+            assert [(c["nome"], c["args"]) for c in r["chamadas"]] == [(c["nome"], c["args"]) for c in e["chamadas"]]
+
+
+def test_sistema_configuravel(tok):
+    assert prompt_sistema(tok, "XYZ").startswith("<|im_start|>system\nXYZ")
+    ids, _ = renderizar(EVENTOS[:2], tok, sistema="XYZ")
+    assert tok.decode(ids).startswith("<|im_start|>system\nXYZ")
+    assert tok.decode(prompt_geracao(EVENTOS[:2], tok, sistema="XYZ")).startswith("<|im_start|>system\nXYZ")

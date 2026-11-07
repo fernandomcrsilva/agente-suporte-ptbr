@@ -4,6 +4,7 @@ O raciocínio vazio fica em todas as falas do agente, inclusive nas antigas. O t
 bloco da história, mas aqui treino e inferência montam o prompt do mesmo jeito, então ele fica.
 """
 import json
+import re
 
 from cenarios import EMPRESA
 from sistema import ferramentas_qwen
@@ -13,8 +14,8 @@ PROMPT_ALUNO = (f"Você é o atendente de suporte da {EMPRESA}, um app de delive
 INICIO_AGENTE = "<|im_start|>assistant\n<think>\n\n</think>\n\n"
 
 
-def prompt_sistema(tok) -> str:
-    return tok.apply_chat_template([{"role": "system", "content": PROMPT_ALUNO}], tools=ferramentas_qwen(),
+def prompt_sistema(tok, sistema: str = PROMPT_ALUNO) -> str:
+    return tok.apply_chat_template([{"role": "system", "content": sistema}], tools=ferramentas_qwen(),
                                    tokenize=False)
 
 
@@ -25,9 +26,9 @@ def corpo(evento: dict) -> str:
     return "\n".join(partes)
 
 
-def _pedacos(eventos: list[dict], tok) -> list[tuple[str, bool]]:
+def _pedacos(eventos: list[dict], tok, sistema: str) -> list[tuple[str, bool]]:
     """(texto, entra na perda?) na ordem do prompt."""
-    out, contexto, respostas = [(prompt_sistema(tok), False)], None, []
+    out, contexto, respostas = [(prompt_sistema(tok, sistema), False)], None, []
 
     def fechar_respostas():
         if respostas:
@@ -53,14 +54,31 @@ def _pedacos(eventos: list[dict], tok) -> list[tuple[str, bool]]:
     return out
 
 
-def renderizar(eventos: list[dict], tok) -> tuple[list[int], list[int]]:
+def renderizar(eventos: list[dict], tok, sistema: str = PROMPT_ALUNO) -> tuple[list[int], list[int]]:
     ids, rotulos = [], []
-    for texto, perda in _pedacos(eventos, tok):
+    for texto, perda in _pedacos(eventos, tok, sistema):
         x = tok(texto, add_special_tokens=False)["input_ids"]
         ids += x
         rotulos += x if perda else [-100] * len(x)
     return ids, rotulos
 
 
-def prompt_geracao(eventos: list[dict], tok) -> list[int]:
-    return renderizar(eventos, tok)[0] + tok(INICIO_AGENTE, add_special_tokens=False)["input_ids"]
+def prompt_geracao(eventos: list[dict], tok, sistema: str = PROMPT_ALUNO) -> list[int]:
+    return renderizar(eventos, tok, sistema)[0] + tok(INICIO_AGENTE, add_special_tokens=False)["input_ids"]
+
+
+_CHAMADA = re.compile(r"<tool_call>\s*(.*?)\s*(?:</tool_call>|$)", re.S)
+
+
+def interpretar(saida: str, prefixo_id: str) -> dict:
+    """Lê uma fala gerada pelo Qwen: texto para o cliente e chamadas `<tool_call>`, mesmo malformadas."""
+    saida = saida.split("<|im_end|>")[0]
+    saida = re.sub(r"<think>.*?</think>", "", saida, flags=re.S)
+    chamadas = []
+    for k, bruto in enumerate(_CHAMADA.findall(saida)):
+        try:
+            obj = json.loads(bruto)
+            chamadas.append({"id": f"{prefixo_id}{k}", "nome": obj["name"], "args": obj.get("arguments") or {}})
+        except (json.JSONDecodeError, KeyError, TypeError):
+            chamadas.append({"id": f"{prefixo_id}{k}", "nome": "_invalida", "args": {"_argumentos_invalidos": bruto}})
+    return {"texto": _CHAMADA.sub("", saida).strip(), "chamadas": chamadas}
