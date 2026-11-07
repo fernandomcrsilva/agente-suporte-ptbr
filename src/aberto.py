@@ -1,11 +1,15 @@
 """Professor e cliente simulado abertos, no Workers AI da Cloudflare, no formato de chat da OpenAI.
 
 As conversas de treino saem daqui: a Política de Uso da Anthropic proíbe treinar modelos com saídas do Claude.
-O modelo, nos dois papéis, é o DeepSeek V4.1 Flash, de licença MIT. O gpt-oss-120b foi descartado: no Workers AI, as chamadas de ferramenta dele
-voltavam como marcadores internos (`<|channel|>commentary to=functions...`) no meio do texto, e o GLM-4.7 Flash,
-como cliente, saía vazio ou num português estranho (testes de 07/11/2026).
+Professor: DeepSeek V4.1 Flash (MIT). Cliente: Mistral Small 3.1 (Apache 2.0). Testes de 07/11/2026:
+- o gpt-oss-120b foi descartado: no Workers AI, as chamadas de ferramenta dele voltavam como marcadores internos
+  (`<|channel|>commentary to=functions...`) no meio do texto;
+- como cliente, o GLM-4.7 Flash saía vazio ou num português estranho, e o gpt-oss-20b encerrava na primeira fala;
+- o DeepSeek é modelo do plano pago, limitado a 20 requisições por minuto, por isso o cliente fica num modelo do
+  limite padrão (300 por minuto) e as chamadas do professor são espaçadas.
 """
 import json
+import threading
 import time
 
 import requests
@@ -18,20 +22,39 @@ from prompts import fala_do_agente, professor
 from sistema import ferramentas_openai
 
 PROFESSOR = "@cf/deepseek-ai/deepseek-v4.1-flash-1017"
-CLIENTE = PROFESSOR  # sem raciocínio: o cliente só fala
+CLIENTE = "@cf/mistralai/mistral-small-3.1-24b-instruct"
+LIMITES = {PROFESSOR: 18}  # requisições por minuto; o limite da Cloudflare é 20, com folga para não bater nele
 URL = "https://api.cloudflare.com/client/v4/accounts/{conta}/ai/v1/chat/completions"
 
 
 class WorkersAI:
-    def __init__(self, conta: str, token: str, sessao=None, tentativas: int = 5, espera: float = 2.0):
+    def __init__(self, conta: str, token: str, sessao=None, tentativas: int = 8, espera: float = 5.0,
+                 limites: dict[str, int] | None = None, dormir=time.sleep, relogio=time.monotonic):
         self.url = URL.format(conta=conta)
         self.sessao = sessao or requests.Session()
         self.sessao.headers["Authorization"] = f"Bearer {token}"
         self.tentativas, self.espera = tentativas, espera
+        self.intervalo = {m: 60 / n for m, n in (limites or {}).items()}
+        self.dormir, self.relogio = dormir, relogio
+        self._trava, self._proxima = threading.Lock(), {}
+
+    def _aguardar_vez(self, modelo: str) -> None:
+        """Espaça as chamadas de um modelo com limite por minuto, somando todas as threads."""
+        intervalo = self.intervalo.get(modelo)
+        if not intervalo:
+            return
+        with self._trava:
+            agora = self.relogio()
+            vez = max(agora, self._proxima.get(modelo, 0.0))
+            self._proxima[modelo] = vez + intervalo
+        if vez > agora:
+            self.dormir(vez - agora)
 
     def completar(self, **corpo) -> dict:
         erro = ""
         for k in range(self.tentativas):
+            self._aguardar_vez(corpo.get("model", ""))
+            espera = self.espera * 2 ** k
             try:
                 r = self.sessao.post(self.url, json=corpo, timeout=180)
             except requests.RequestException as e:
@@ -42,7 +65,11 @@ class WorkersAI:
                 erro = f"HTTP {r.status_code}: {r.text[:300]}"
                 if r.status_code not in (408, 429) and r.status_code < 500:
                     break  # erro do pedido: tentar de novo não resolve
-            time.sleep(self.espera * 2 ** k)
+                pedido = r.headers.get("retry-after")
+                if pedido and pedido.replace(".", "", 1).isdigit():
+                    espera = float(pedido)
+            if k < self.tentativas - 1:
+                self.dormir(min(espera, 120))
         raise RuntimeError(f"Workers AI falhou: {erro}")
 
 
@@ -86,16 +113,15 @@ class ProfessorAberto:
 
 
 class ClienteAberto:
-    def __init__(self, api, c: Cenario, modelo: str = CLIENTE, esforco: str = "none"):
-        self.api, self.modelo, self.esforco = api, modelo, esforco
+    def __init__(self, api, c: Cenario, modelo: str = CLIENTE):
+        self.api, self.modelo = api, modelo
         self.sistema = prompt_cliente(c)
         self.mensagens: list[dict] = [{"role": "system", "content": self.sistema}]
         self.uso = Uso(modelo)
 
     def falar(self, texto_agente: str | None) -> str | None:
         self.mensagens.append({"role": "user", "content": fala_do_agente(texto_agente)})
-        msg = _resposta(self.api.completar(model=self.modelo, messages=self.mensagens, reasoning_effort=self.esforco,
-                                           max_tokens=2000), self.uso)
+        msg = _resposta(self.api.completar(model=self.modelo, messages=self.mensagens, max_tokens=1000), self.uso)
         texto = (msg.get("content") or "").strip()
         self.mensagens.append({"role": "assistant", "content": texto})
         return None if "[FIM]" in texto else texto

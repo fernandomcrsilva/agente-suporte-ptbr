@@ -8,7 +8,7 @@ PRECOS = {
     "claude-haiku-5-5": (0.10, 0.50, 0.10, 0.125),  # ponytail: sem preço de cache do Haiku na tabela; usa o teto
     # Workers AI. A escrita de cache não é cobrada à parte; a leitura sai com desconto onde o modelo tem cache.
     "@cf/deepseek-ai/deepseek-v4.1-flash-1017": (0.30, 1.20, 0.006, 0.30),
-    "@cf/zai-org/glm-4.7-flash": (0.06, 0.40, 0.06, 0.06),
+    "@cf/mistralai/mistral-small-3.1-24b-instruct": (0.351, 0.555, 0.351, 0.351),
     "@cf/openai/gpt-oss-120b": (0.35, 0.75, 0.35, 0.35),
 }
 

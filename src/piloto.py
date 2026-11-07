@@ -171,8 +171,8 @@ def main():
         faltam = [v for v in ("CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN") if not os.environ.get(v)]
         if faltam:
             sys.exit(f"Falta {' e '.join(faltam)} no arquivo .env na raiz do repositório.")
-        from aberto import ClienteAberto, ProfessorAberto, WorkersAI
-        api = WorkersAI(os.environ["CLOUDFLARE_ACCOUNT_ID"], os.environ["CLOUDFLARE_API_TOKEN"])
+        from aberto import LIMITES, ClienteAberto, ProfessorAberto, WorkersAI
+        api = WorkersAI(os.environ["CLOUDFLARE_ACCOUNT_ID"], os.environ["CLOUDFLARE_API_TOKEN"], limites=LIMITES)
         fabrica = lambda c: (ProfessorAberto(api), ClienteAberto(api, c))  # noqa: E731
     saida.mkdir(parents=True, exist_ok=True)
 

@@ -32,7 +32,7 @@ def resposta(texto="", chamadas=(), fim="stop", entrada=100, saida=20):
 def test_custo_workers_ai():
     assert Uso(PROFESSOR, entrada=1_000_000, saida=1_000_000).custo() == pytest.approx(1.50)
     assert Uso(PROFESSOR, cache_leitura=1_000_000).custo() == pytest.approx(0.006)
-    assert CLIENTE == PROFESSOR
+    assert Uso(CLIENTE, entrada=1_000_000, saida=1_000_000).custo() == pytest.approx(0.906)
 
 
 def test_uso_soma_formato_openai():
@@ -92,16 +92,16 @@ def test_cliente_aberto_encerra_com_fim_e_nao_pede_humano():
     cli = ClienteAberto(api, gerar(1, "status"))
     assert cli.falar(None) == "cadê meu pedido?"
     assert cli.falar("Está a caminho.") is None
-    assert api.chamadas[0]["model"] == CLIENTE
-    assert api.chamadas[0]["reasoning_effort"] == "none"  # o cliente só fala; raciocínio é custo à toa
+    assert api.chamadas[0]["model"] == CLIENTE == "@cf/mistralai/mistral-small-3.1-24b-instruct"
+    assert "reasoning_effort" not in api.chamadas[0]
     assert FRASE_HUMANO in api.chamadas[0]["messages"][0]["content"]
     assert [m["role"] for m in api.chamadas[1]["messages"]] == ["system", "user", "assistant", "user"]
     assert FRASE_HUMANO not in ClienteAberto(APIFalsa([]), gerar(1, "humano")).sistema
 
 
 class Resp:
-    def __init__(self, status, corpo=None):
-        self.status_code, self.corpo, self.text = status, corpo or {}, str(corpo)
+    def __init__(self, status, corpo=None, headers=None):
+        self.status_code, self.corpo, self.text, self.headers = status, corpo or {}, str(corpo), headers or {}
 
     def json(self):
         return self.corpo
@@ -136,3 +136,25 @@ def test_workers_ai_desiste_e_nao_mostra_o_token():
     assert "segredo123" not in str(e.value)
     with pytest.raises(RuntimeError):
         WorkersAI("c", "t", sessao=SessaoFalsa([Resp(400, {"errors": ["x"]})]), espera=0).completar(model="m")
+
+
+def test_workers_ai_respeita_o_retry_after_no_429():
+    esperas = []
+    s = SessaoFalsa([Resp(429, headers={"retry-after": "7"}), Resp(200, resposta("oi"))])
+    WorkersAI("c", "t", sessao=s, espera=1, dormir=esperas.append).completar(model="m")
+    assert esperas == [7.0]
+
+
+def test_workers_ai_espaca_as_chamadas_do_modelo_com_limite():
+    relogio, esperas = [0.0], []
+
+    def dormir(x):
+        esperas.append(x)
+        relogio[0] += x
+
+    api = WorkersAI("c", "t", sessao=SessaoFalsa([Resp(200, resposta("oi"))] * 4), limites={"lento": 60},
+                    dormir=dormir, relogio=lambda: relogio[0])
+    for _ in range(3):
+        api.completar(model="lento")
+    api.completar(model="rapido")  # modelo sem limite configurado não espera
+    assert esperas == [pytest.approx(1.0), pytest.approx(1.0)]
