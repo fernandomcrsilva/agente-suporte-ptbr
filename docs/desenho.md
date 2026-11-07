@@ -75,7 +75,7 @@ A resposta certa vem das regras, não de um LLM **(Fernando)**. A ideia de avali
 
 Um LLM faz o papel do cliente, conversando com o agente. Ele recebe os fatos do cenário e só pode afirmar o que está neles. Assim, não inventa um detalhe que mude a resposta certa. Ele encerra quando o problema foi resolvido ou depois de um limite de turnos (por exemplo, 8).
 
-O modelo do cliente simulado é o **gpt-oss-20b**, no Workers AI da Cloudflare **(minha escolha)**: o papel é simples e as chamadas são muitas. Ele precisa ser aberto pelo mesmo motivo do professor (veja "Como o aluno aprende"), porque as falas dele entram nas conversas de treino.
+O modelo do cliente simulado é o **GLM-4.7 Flash**, de licença MIT, no Workers AI da Cloudflare **(minha escolha)**: o papel é simples e as chamadas são muitas. Ele precisa ser aberto pelo mesmo motivo do professor (veja "Como o aluno aprende"), porque as falas dele entram nas conversas de treino.
 
 ### O que se compara
 
@@ -93,7 +93,7 @@ O placar compara o **estado final** do sistema com o esperado, e não a sequênc
 | Sistema | Papel |
 |---|---|
 | Claude Opus 5.5 com as ferramentas | Referência paga, só para medir. Não gera dados de treino |
-| Professor, gpt-oss-120b com as ferramentas | O professor aberto, de quem o aluno aprende |
+| Professor, DeepSeek V4.1 Flash com as ferramentas | O professor aberto, de quem o aluno aprende |
 | Aluno, Qwen3-1.7B com LoRA | O resultado principal |
 | Qwen3-1.7B sem treino, com o prompt completo do professor | Mostra quanto o treino ajudou |
 | Qwen3-8B sem treino, via Ollama, com o prompt completo (opcional) | Um modelo aberto maior rodando em casa, ligando ao artigo anterior |
@@ -103,7 +103,8 @@ Os modelos sem treino recebem o prompt completo do professor, com a política es
 ## Como o aluno aprende
 
 1. **O professor atende de verdade.** Ele roda num loop real com as ferramentas do sistema simulado. As respostas das ferramentas vêm sempre do código, nunca do professor.
-   - **Mudança de 07/11/2026 (Fernando):** o professor deixou de ser o Claude. A [Política de Uso da Anthropic](https://www.anthropic.com/legal/aup) proíbe usar saídas do Claude para treinar um modelo sem autorização prévia. O professor passou a ser o **gpt-oss-120b**, de pesos abertos sob Apache 2.0, chamado pelo Workers AI da Cloudflare, que o Fernando já usa no Perry.
+   - **Mudança de 07/11/2026 (Fernando):** o professor deixou de ser o Claude. A [Política de Uso da Anthropic](https://www.anthropic.com/legal/aup) proíbe usar saídas do Claude para treinar um modelo sem autorização prévia. O professor passou a ser aberto, chamado pelo Workers AI da Cloudflare, que o Fernando já usa no Perry.
+   - A primeira escolha foi o gpt-oss-120b, mas no Workers AI as chamadas de ferramenta dele voltaram quebradas, como marcadores internos no meio do texto, nas três rotas da API. Num teste com uma pergunta, o **DeepSeek V4.1 Flash** e o GLM-4.7 Flash devolveram chamadas certas. Os dois têm licença MIT, que permite treinar com as saídas. O professor é o DeepSeek V4.1 Flash, o mais forte dos dois **(minha escolha)**.
    - O Claude continua no projeto só para medir: ele é a linha de referência no teste e o juiz da qualidade do texto. Nenhuma saída dele entra no treino.
    - O piloto feito com o Claude serviu para validar o sistema e o loop. Aquelas conversas não entram no treino.
 2. **Só entram no treino as conversas que o professor acertou.** Uma conversa é descartada se o estado final dela diferir do esperado. A taxa de acerto do professor é medida à parte, nos cenários de teste, sem esse filtro.
@@ -112,10 +113,10 @@ Os modelos sem treino recebem o prompt completo do professor, com a política es
 5. **O aluno recebe um prompt curto (minha escolha).** São uma ou duas linhas de papel mais as definições compactas das ferramentas, sem o texto da política, que ele aprende pelos exemplos. Os limites rígidos continuam garantidos pelas ferramentas. É o mesmo caminho do review-aspects, em que o prompt curto deixou o treino 3,4 vezes mais rápido. Aqui ele também é o que torna a demo viável na CPU, porque um prompt de 2.500 tokens demoraria demais para ser processado a cada conversa. O mesmo prompt curto é usado no treino, na avaliação e na demo.
 6. **O aluno é o Qwen3-1.7B, com LoRA, na RX 7600.** O 4B só entra se o teste de memória mostrar que cabe.
 
-Detalhes do gpt-oss-120b no Workers AI:
+Detalhes do professor aberto no Workers AI:
 
 - Use o endpoint compatível com a OpenAI (`/ai/v1/chat/completions`), com `tools` no formato de funções da OpenAI e as descrições longas das ferramentas.
-- Use o raciocínio baixo. Trate `finish_reason == "length"` como recusa e descarte a conversa: no Perry, o raciocínio do gpt-oss já consumiu o `max_tokens` inteiro e deixou a resposta vazia.
+- Use o raciocínio baixo. Trate `finish_reason == "length"` como recusa e descarte a conversa: no Perry, o raciocínio de um modelo aberto já consumiu o `max_tokens` inteiro e deixou a resposta vazia.
 
 Detalhes do Claude, que agora só roda como referência no teste:
 
@@ -133,7 +134,7 @@ A ordem protege os 200 dólares: primeiro tudo que é de graça, depois um pilot
 2. **Teste de memória do treino.** Passe conversas falsas, montadas à mão, pelo script de treino com poucas amostras. Elas devem ter o prompt curto do aluno e uns 3.000 tokens no total, com folga sobre o tamanho esperado. O objetivo é provar que o Qwen3-1.7B cabe nos 8 GB **antes** de gastar com a API. Cerca de 30 minutos.
 3. **Piloto com cerca de 30 conversas do professor**, em cenários de sementes próprias, que não são nem de treino nem de teste. Mede o custo real por conversa e a taxa de acerto do professor. Se aparecer erro no prompt ou na política, os dois podem ser corrigidos olhando só as conversas do piloto, e o piloto roda de novo. Depois disso, prompt e política ficam congelados. Nenhum cenário de teste roda antes do congelamento. Cerca de 1 hora e de 2 a 5 dólares.
 4. **Travas antes do gasto grande:**
-   - Os termos da Anthropic foram conferidos em 07/11/2026: treinar com saídas do Claude exige autorização. Por isso, o professor passou a ser aberto, e um novo piloto, agora com o gpt-oss-120b, roda antes da geração.
+   - Os termos da Anthropic foram conferidos em 07/11/2026: treinar com saídas do Claude exige autorização. Por isso, o professor passou a ser aberto, e um novo piloto, agora com o professor aberto, roda antes da geração.
    - O Fernando decide, com o custo real na mão, quantas conversas gerar. A estimativa abaixo serve só de ponto de partida.
 5. Geração completa, treino, avaliação, GGUF e demo, README e publicação.
 
@@ -143,7 +144,7 @@ A ordem protege os 200 dólares: primeiro tudo que é de graça, depois um pilot
 - **Preços por milhão de tokens, entrada / saída:** Opus 5.5 custa US$ 4 / 20, com leitura de cache a 0,20. Sonnet 5.5 custa US$ 2 / 10, também com cache a 0,20. Haiku 5.5 custa US$ 0,10 / 0,50.
 - **Estimativa grosseira por conversa com o Opus 5.5** (umas 5 chamadas, prompt de sistema de uns 2.500 tokens em cache e raciocínio baixo): perto de US$ 0,06. Pode ser metade disso ou o dobro, e o piloto é que diz.
 - **Piloto com o Claude:** custou US$ 0,96 nas 30 conversas, US$ 0,032 cada. O professor acertou 30 de 30.
-- **Professor aberto:** o gpt-oss-120b custa US$ 0,35 por milhão de tokens de entrada e US$ 0,75 por milhão de saída, e o gpt-oss-20b, US$ 0,20 e US$ 0,30. Com o volume de tokens do piloto, cada conversa deve custar perto de US$ 0,01, cobrado na conta da Cloudflare.
+- **Professor aberto:** o DeepSeek V4.1 Flash custa US$ 0,30 por milhão de tokens de entrada (US$ 0,006 em cache) e US$ 1,20 por milhão de saída, e o GLM-4.7 Flash, US$ 0,06 e US$ 0,40. Com o volume de tokens do piloto, cada conversa deve custar perto de US$ 0,01, cobrado na conta da Cloudflare.
 - **Divisão sugerida:**
   - a geração de 2.000 conversas de treino custa uns US$ 20 na Cloudflare;
   - até US$ 25 dos créditos da Anthropic vão para a avaliação: o Claude Opus 5.5 como referência nos 300 cenários de teste e o juiz;
@@ -182,7 +183,7 @@ A ordem protege os 200 dólares: primeiro tudo que é de graça, depois um pilot
 ## Limitações para escrever no README
 
 - O juiz é da família Claude, como a linha de referência. Isso pode favorecer o estilo do Claude sobre o do professor aberto e o do aluno. Por isso o estado final é a métrica principal e o juiz é secundário. É o mesmo cuidado do artigo anterior.
-- O cliente simulado é o gpt-oss-20b, da mesma família do professor, o que pode deixar as conversas de treino mais fáceis para ele do que seriam com clientes de verdade.
+- O cliente simulado é um modelo de linguagem, que escreve de forma mais limpa e previsível que clientes de verdade. Isso pode deixar as conversas de treino mais fáceis do que o atendimento real.
 - Os cenários são sintéticos. Clientes reais escrevem de formas que o gerador não prevê.
 - O aluno é treinado uma vez só, com uma semente.
 

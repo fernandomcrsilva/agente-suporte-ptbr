@@ -88,6 +88,18 @@ def rodar_lote(cenarios, fabrica, teto_dolares: float, paralelo: int = 4, ao_ter
                     ao_terminar(reg)
 
 
+FINS_DE_VERDADE = ("cliente_encerrou", "transferido")
+
+
+def aproveitaveis(registros: list[dict]) -> list[dict]:
+    """Conversas que podem ir para o treino: certas e terminadas de verdade, e não cortadas por limite.
+
+    Sem isso, um cenário que pede "nada a fazer" passa como certo mesmo se o professor travou e não fez nada.
+    """
+    return [r for r in registros if r["status"] == "ok" and r["resultado"]["resolvido"]
+            and r["motivo_fim"] in FINS_DE_VERDADE]
+
+
 def _br(x: float, casas: int = 2) -> str:
     return f"{x:,.{casas}f}".replace(",", "_").replace(".", ",").replace("_", ".")
 
@@ -108,6 +120,9 @@ def relatorio(registros: list[dict]) -> str:
         f"acerto do professor: {t['resolvidos']}/{t['n']} ({_br(100 * t['resolvidos'] / max(t['n'], 1), 0)}%) | "
         f"erros graves: {t['erros_graves']} | tentativas bloqueadas: {t['bloqueios']} | "
         f"transferências certas: {t['transferencias_certas']}/{t['n']}",
+        f"aproveitáveis para treino: {len(aproveitaveis(registros))}/{n} | fim: " + ", ".join(
+            f"{m} {sum(r.get('motivo_fim') == m for r in ok)}"
+            for m in ("cliente_encerrou", "transferido", "limite_turnos", "limite_ferramentas")),
         "por tipo:",
         *[f"  {tipo}: {d['resolvidos']}/{d['n']}" + (f", {d['erros_graves']} erro(s) grave(s)" if d["erros_graves"] else "")
           for tipo, d in sorted(s["por_tipo"].items())],

@@ -6,8 +6,10 @@ PRECOS = {
     "claude-opus-5-5": (4.00, 20.00, 0.20, 5.00),
     "claude-sonnet-5-5": (2.00, 10.00, 0.20, 2.50),
     "claude-haiku-5-5": (0.10, 0.50, 0.10, 0.125),  # ponytail: sem preço de cache do Haiku na tabela; usa o teto
-    "@cf/openai/gpt-oss-120b": (0.35, 0.75, 0.35, 0.35),  # Workers AI, sem desconto de cache
-    "@cf/openai/gpt-oss-20b": (0.20, 0.30, 0.20, 0.20),
+    # Workers AI. A escrita de cache não é cobrada à parte; a leitura sai com desconto onde o modelo tem cache.
+    "@cf/deepseek-ai/deepseek-v4.1-flash-1017": (0.30, 1.20, 0.006, 0.30),
+    "@cf/zai-org/glm-4.7-flash": (0.06, 0.40, 0.06, 0.06),
+    "@cf/openai/gpt-oss-120b": (0.35, 0.75, 0.35, 0.35),
 }
 
 
@@ -22,7 +24,9 @@ class Uso:
     def somar(self, u) -> None:
         """Aceita o `usage` da Anthropic (objeto) ou o do formato OpenAI (dict)."""
         if isinstance(u, dict):
-            self.entrada += u.get("prompt_tokens") or 0
+            cache = (u.get("prompt_tokens_details") or {}).get("cached_tokens") or 0
+            self.entrada += (u.get("prompt_tokens") or 0) - cache
+            self.cache_leitura += cache
             self.saida += u.get("completion_tokens") or 0
             return
         self.entrada += u.input_tokens

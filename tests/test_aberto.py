@@ -30,14 +30,17 @@ def resposta(texto="", chamadas=(), fim="stop", entrada=100, saida=20):
 
 
 def test_custo_workers_ai():
-    assert Uso(PROFESSOR, entrada=1_000_000, saida=1_000_000).custo() == pytest.approx(1.10)
-    assert Uso(CLIENTE, entrada=1_000_000, saida=1_000_000).custo() == pytest.approx(0.50)
+    assert Uso(PROFESSOR, entrada=1_000_000, saida=1_000_000).custo() == pytest.approx(1.50)
+    assert Uso(PROFESSOR, cache_leitura=1_000_000).custo() == pytest.approx(0.006)
+    assert Uso(CLIENTE, entrada=1_000_000, saida=1_000_000).custo() == pytest.approx(0.46)
 
 
 def test_uso_soma_formato_openai():
     u = Uso(PROFESSOR)
     u.somar({"prompt_tokens": 100, "completion_tokens": 20})
     assert (u.entrada, u.saida) == (100, 20)
+    u.somar({"prompt_tokens": 100, "completion_tokens": 5, "prompt_tokens_details": {"cached_tokens": 80}})
+    assert (u.entrada, u.saida, u.cache_leitura) == (120, 25, 80)
 
 
 def test_ferramentas_openai_tem_as_descricoes_longas():
@@ -68,7 +71,7 @@ def test_professor_pede_ferramentas_e_raciocinio_baixo():
     api = APIFalsa([resposta("oi")])
     ProfessorAberto(api).passo([{"papel": "cliente", "texto": "oi"}])
     corpo = api.chamadas[0]
-    assert corpo["model"] == PROFESSOR == "@cf/openai/gpt-oss-120b"
+    assert corpo["model"] == PROFESSOR == "@cf/deepseek-ai/deepseek-v4.1-flash-1017"
     assert corpo["tools"] == ferramentas_openai() and corpo["tool_choice"] == "auto"
     assert corpo["reasoning_effort"] == "low"
 
@@ -89,7 +92,8 @@ def test_cliente_aberto_encerra_com_fim_e_nao_pede_humano():
     cli = ClienteAberto(api, gerar(1, "status"))
     assert cli.falar(None) == "cadê meu pedido?"
     assert cli.falar("Está a caminho.") is None
-    assert api.chamadas[0]["model"] == CLIENTE
+    assert api.chamadas[0]["model"] == CLIENTE == "@cf/zai-org/glm-4.7-flash"
+    assert "reasoning_effort" not in api.chamadas[0]
     assert FRASE_HUMANO in api.chamadas[0]["messages"][0]["content"]
     assert [m["role"] for m in api.chamadas[1]["messages"]] == ["system", "user", "assistant", "user"]
     assert FRASE_HUMANO not in ClienteAberto(APIFalsa([]), gerar(1, "humano")).sistema

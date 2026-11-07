@@ -80,12 +80,21 @@ def test_relatorio_do_professor_aberto():
     class AgenteAberto(AgenteFalso):
         def __init__(self):
             super().__init__()
-            self.uso = Uso("@cf/openai/gpt-oss-120b", entrada=20_000)  # US$ 0,007 por conversa
+            self.uso = Uso("@cf/deepseek-ai/deepseek-v4.1-flash-1017", entrada=20_000)  # US$ 0,006 por conversa
 
     regs = rodar_lote(lote(PILOTO, 2), lambda c: (AgenteAberto(), ClienteFalso()), 100, 1)
     texto = relatorio(regs)
-    assert "gpt-oss-120b" in texto and "Sonnet" not in texto
-    assert "estimativa para 2.000 conversas: US$ 14 (medido, @cf/openai/gpt-oss-120b)" in texto
+    assert "deepseek" in texto and "Sonnet" not in texto
+    assert "estimativa para 2.000 conversas: US$ 12 (medido, @cf/deepseek-ai/deepseek-v4.1-flash-1017)" in texto
+
+
+def test_aproveitaveis_exigem_fim_de_verdade():
+    from piloto import aproveitaveis
+    regs = rodar_lote(lote(PILOTO, 2), lambda c: (AgenteFalso(), ClienteFalso()), 100, 1)
+    regs[1]["motivo_fim"] = "limite_turnos"
+    assert [r["cenario"]["id"] for r in aproveitaveis(regs)] == [regs[0]["cenario"]["id"]]
+    assert "aproveitáveis para treino: 1/2" in relatorio(regs)
+    assert "limite_turnos 1" in relatorio(regs)
 
 
 def test_relatorio():

@@ -1,6 +1,8 @@
-"""Professor e cliente simulado abertos (gpt-oss no Workers AI da Cloudflare), no formato de chat da OpenAI.
+"""Professor e cliente simulado abertos, no Workers AI da Cloudflare, no formato de chat da OpenAI.
 
 As conversas de treino saem daqui: a Política de Uso da Anthropic proíbe treinar modelos com saídas do Claude.
+Os dois modelos têm licença MIT. O gpt-oss-120b foi descartado: no Workers AI, as chamadas de ferramenta dele
+voltavam como marcadores internos (`<|channel|>commentary to=functions...`) no meio do texto (teste de 07/11/2026).
 """
 import json
 import time
@@ -14,8 +16,8 @@ from prompts import cliente as prompt_cliente
 from prompts import fala_do_agente, professor
 from sistema import ferramentas_openai
 
-PROFESSOR = "@cf/openai/gpt-oss-120b"
-CLIENTE = "@cf/openai/gpt-oss-20b"
+PROFESSOR = "@cf/deepseek-ai/deepseek-v4.1-flash-1017"
+CLIENTE = "@cf/zai-org/glm-4.7-flash"
 URL = "https://api.cloudflare.com/client/v4/accounts/{conta}/ai/v1/chat/completions"
 
 
@@ -47,7 +49,7 @@ def _resposta(r: dict, uso: Uso) -> dict:
     uso.somar(r.get("usage") or {})
     escolha = r["choices"][0]
     if escolha.get("finish_reason") == "length":
-        raise Recusa("length")  # o raciocínio do gpt-oss pode comer o max_tokens inteiro
+        raise Recusa("length")  # o raciocínio pode comer o max_tokens inteiro
     return escolha["message"]
 
 
@@ -83,16 +85,15 @@ class ProfessorAberto:
 
 
 class ClienteAberto:
-    def __init__(self, api, c: Cenario, modelo: str = CLIENTE, esforco: str = "low"):
-        self.api, self.modelo, self.esforco = api, modelo, esforco
+    def __init__(self, api, c: Cenario, modelo: str = CLIENTE):
+        self.api, self.modelo = api, modelo
         self.sistema = prompt_cliente(c)
         self.mensagens: list[dict] = [{"role": "system", "content": self.sistema}]
         self.uso = Uso(modelo)
 
     def falar(self, texto_agente: str | None) -> str | None:
         self.mensagens.append({"role": "user", "content": fala_do_agente(texto_agente)})
-        msg = _resposta(self.api.completar(model=self.modelo, messages=self.mensagens,
-                                           reasoning_effort=self.esforco, max_tokens=4000), self.uso)
+        msg = _resposta(self.api.completar(model=self.modelo, messages=self.mensagens, max_tokens=4000), self.uso)
         texto = (msg.get("content") or "").strip()
         self.mensagens.append({"role": "assistant", "content": texto})
         return None if "[FIM]" in texto else texto
