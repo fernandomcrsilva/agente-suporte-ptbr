@@ -179,7 +179,9 @@ def main():
     def gravar(r):
         (saida / f"{r['cenario']['id']}.json").write_text(json.dumps(r, ensure_ascii=False, indent=1))
 
-    registros = rodar_lote(lote(args.inicio, args.n), fabrica, args.teto_dolares, args.paralelo, ao_terminar=gravar)
+    cenarios = [c for c in lote(args.inicio, args.n) if not (saida / f"{c.id}.json").exists()]  # retomável
+    print(f"{len(cenarios)} conversas a rodar ({args.n - len(cenarios)} já gravadas em {saida})", flush=True)
+    registros = rodar_lote(cenarios, fabrica, args.teto_dolares, args.paralelo, ao_terminar=gravar)
     texto = relatorio(registros)
     (saida / "relatorio.txt").write_text(texto + "\n")
     print(texto)

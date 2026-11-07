@@ -33,3 +33,22 @@ Com 30 conversas, o acerto por tipo não é confiável: o piloto não sorteou, p
 Pontos observados ao ler as conversas:
 - Às vezes o professor escreve uma nota curta antes de chamar uma ferramenta, como "Entregue hoje, dentro de 48h; só reembolso do item." O cliente não vê essa nota, mas ela entra nos dados de treino do aluno.
 - O cliente simulado repete "não sei o número do pedido", porque o prompt dele diz que ele não sabe o número.
+
+## Piloto do professor aberto (07/11/2026)
+
+Foram as mesmas 30 sementes de piloto. O professor foi o DeepSeek V4.1 Flash, com raciocínio baixo, e o cliente simulado foi o Mistral Small 3.1, os dois no Workers AI. As chamadas do DeepSeek ficaram espaçadas a 18 por minuto.
+
+| Medida | Valor |
+|---|---|
+| Conversas | 30, sem recusa nem falha |
+| Acerto do professor | 30 de 30 |
+| Aproveitáveis para treino (certas e terminadas de verdade) | 30 de 30: 24 encerradas pelo cliente e 6 transferidas |
+| Erros graves e tentativas bloqueadas | 0 e 0 |
+| Custo total | US$ 0,04, ou US$ 0,001 por conversa |
+| Estimativa para 2.000 conversas | cerca de US$ 3, em umas 8 horas por causa do limite de 20 requisições por minuto |
+
+Antes disso, dois testes descartaram modelos:
+- o gpt-oss-120b devolveu as chamadas de ferramenta como marcadores internos no meio do texto;
+- o GLM-4.7 Flash, como cliente, saiu vazio ou num português estranho.
+
+Ao ler cinco conversas, o professor rastreou o pedido antes de decidir, recusou o pedido de R$ 500, deu uma compensação só por pedido, negou com educação o pedido de outra pessoa e transferiu os casos de teto e de "não chegou". Só uma fala do agente, nas 30 conversas, trouxe texto junto de uma chamada de ferramenta.
