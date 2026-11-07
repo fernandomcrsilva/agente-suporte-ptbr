@@ -1,0 +1,42 @@
+from exportar import dividir, limpar, selecionar
+
+
+def registro(id, resolvido=True, fim="cliente_encerrou", status="ok", eventos=None):
+    return {"cenario": {"id": id}, "status": status, "motivo_fim": fim, "resultado": {"resolvido": resolvido},
+            "eventos": eventos or [{"papel": "cliente", "texto": "oi"}, {"papel": "agente", "texto": "Olá!", "chamadas": []}]}
+
+
+CHAMADA = {"id": "c1", "nome": "listar_pedidos", "args": {}}
+
+
+def test_seleciona_so_as_aproveitaveis():
+    regs = [registro("a"), registro("b", resolvido=False), registro("c", fim="limite_turnos"),
+            registro("d", status="falha"), registro("e", fim="transferido")]
+    assert [r["cenario"]["id"] for r in selecionar(regs)] == ["a", "e"]
+
+
+def test_fala_com_chamada_perde_o_texto():
+    ev = limpar([{"papel": "cliente", "texto": "oi"},
+                 {"papel": "agente", "texto": "Vou ver.", "chamadas": [CHAMADA]},
+                 {"papel": "ferramenta", "id": "c1", "nome": "listar_pedidos", "resultado": {}},
+                 {"papel": "agente", "texto": "Achei.", "chamadas": []}])
+    assert ev[1] == {"papel": "agente", "texto": "", "chamadas": [CHAMADA]}
+    assert ev[3]["texto"] == "Achei."
+
+
+def test_corta_chamadas_que_nao_rodaram_no_fim():
+    base = [{"papel": "cliente", "texto": "quero um humano"},
+            {"papel": "agente", "texto": "", "chamadas": [CHAMADA]},
+            {"papel": "ferramenta", "id": "c1", "nome": "listar_pedidos", "resultado": {}}]
+    ev = limpar(base + [{"papel": "agente", "texto": "Transferi.", "chamadas": [dict(CHAMADA, id="c2")]}])
+    assert ev[-1] == {"papel": "agente", "texto": "Transferi.", "chamadas": []}
+    ev = limpar(base + [{"papel": "agente", "texto": "", "chamadas": [dict(CHAMADA, id="c2")]}])
+    assert ev[-1]["papel"] == "ferramenta"
+
+
+def test_divide_sem_repetir_e_sempre_igual():
+    regs = [registro(str(i)) for i in range(100)]
+    treino, val = dividir(regs, 0.1)
+    assert len(val) == 10 and len(treino) == 90
+    assert not {r["cenario"]["id"] for r in treino} & {r["cenario"]["id"] for r in val}
+    assert dividir(regs, 0.1) == (treino, val)
