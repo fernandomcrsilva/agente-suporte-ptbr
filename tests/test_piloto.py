@@ -54,6 +54,28 @@ def test_teto_para_de_lancar():
     assert sum(r["custo"] for r in regs) == 3.0
 
 
+def test_cada_registro_e_entregue_assim_que_termina():
+    vistos = []
+    regs = rodar_lote(lote(PILOTO, 3), lambda c: (AgenteFalso(), ClienteFalso()), 100, 2, ao_terminar=vistos.append)
+    assert vistos == regs and len(vistos) == 3
+
+
+def test_fabrica_que_falha_vira_falha():
+    def fabrica(c):
+        raise OSError("sem prompt")
+    regs = rodar_lote(lote(PILOTO, 2), fabrica, 100, 1)
+    assert [r["status"] for r in regs] == ["falha", "falha"]
+    assert relatorio(regs).startswith("conversas: 2 (ok 0, recusadas 0, falhas 2)")
+
+
+def test_estado_ida_e_volta():
+    from modelos import EstadoFinal
+    from piloto import estado_de_dict, estado_dict
+    e = EstadoFinal(reembolsos=frozenset({("P1", frozenset({"i1", "i2"}))}), cupons=frozenset({("P2", 1000)}),
+                    cancelamentos=frozenset({"P3"}), transferido=True)
+    assert estado_de_dict(estado_dict(e)) == e
+
+
 def test_relatorio():
     regs = rodar_lote(lote(PILOTO, 2), lambda c: (AgenteFalso(), ClienteFalso()), 100, 1)
     texto = relatorio(regs)

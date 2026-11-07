@@ -14,7 +14,7 @@ from avaliar import Resultado, avaliar, resumir
 from cenarios import PILOTO, lote
 from claude import Uso
 from conversa import Recusa, rodar
-from modelos import EstadoFinal
+from modelos import Cenario, EstadoFinal
 from politica import esperado
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -23,6 +23,28 @@ RAIZ = Path(__file__).resolve().parent.parent
 def estado_dict(e: EstadoFinal) -> dict:
     return {"reembolsos": sorted([p, sorted(i)] for p, i in e.reembolsos), "cupons": sorted([p, v] for p, v in e.cupons),
             "cancelamentos": sorted(e.cancelamentos), "transferido": e.transferido}
+
+
+def estado_de_dict(d: dict) -> EstadoFinal:
+    return EstadoFinal(reembolsos=frozenset((p, frozenset(i)) for p, i in d["reembolsos"]),
+                       cupons=frozenset((p, v) for p, v in d["cupons"]),
+                       cancelamentos=frozenset(d["cancelamentos"]), transferido=d["transferido"])
+
+
+def reavaliar(registros: list[dict]) -> list[dict]:
+    """Refaz o resultado das conversas salvas com a política e o avaliador atuais, sem chamar a API."""
+    for r in registros:
+        if r["status"] == "ok":
+            c = Cenario.from_dict(r["cenario"])
+            bloqueios = [{}] * r["resultado"]["bloqueios"]
+            r["esperado"] = estado_dict(esperado(c))
+            r["resultado"] = asdict(avaliar(c, estado_de_dict(r["estado"]), bloqueios))
+    return registros
+
+
+def _falha(c, erro) -> dict:
+    return {"cenario": c.to_dict(), "status": "falha", "erro": erro, "custo": 0.0,
+            "uso": {"agente": asdict(Uso("claude-opus-5-5")), "cliente": asdict(Uso("claude-haiku-5-5"))}}
 
 
 def _uma(c, fabrica) -> dict:
@@ -41,19 +63,29 @@ def _uma(c, fabrica) -> dict:
     return reg
 
 
-def rodar_lote(cenarios, fabrica, teto_dolares: float, paralelo: int = 4) -> list[dict]:
-    """Roda as conversas em paralelo e para de lançar novas quando o gasto chega ao teto."""
-    registros, gasto, fila, pendentes = [], 0.0, iter(cenarios), set()
+def rodar_lote(cenarios, fabrica, teto_dolares: float, paralelo: int = 4, ao_terminar=None) -> list[dict]:
+    """Roda as conversas em paralelo e para de lançar novas quando o gasto chega ao teto.
+
+    `ao_terminar(registro)` é chamado assim que cada conversa termina, para nada pago se perder se o lote cair.
+    """
+    registros, gasto, fila, pendentes = [], 0.0, iter(cenarios), {}
     with ThreadPoolExecutor(paralelo) as ex:
         while True:
             while len(pendentes) < paralelo and gasto < teto_dolares and (c := next(fila, None)) is not None:
-                pendentes.add(ex.submit(_uma, c, fabrica))
+                pendentes[ex.submit(_uma, c, fabrica)] = c
             if not pendentes:
                 return registros
-            prontos, pendentes = wait(pendentes, return_when=FIRST_COMPLETED)
+            prontos, _ = wait(pendentes, return_when=FIRST_COMPLETED)
             for f in prontos:
-                registros.append(f.result())
-                gasto += registros[-1]["custo"]
+                c = pendentes.pop(f)
+                try:
+                    reg = f.result()
+                except Exception as e:  # a fábrica falhou antes de a conversa começar
+                    reg = _falha(c, f"{type(e).__name__}: {e}")
+                registros.append(reg)
+                gasto += reg["custo"]
+                if ao_terminar:
+                    ao_terminar(reg)
 
 
 def _br(x: float, casas: int = 2) -> str:
@@ -94,7 +126,17 @@ def main():
     ap.add_argument("--teto-dolares", type=float, default=10)
     ap.add_argument("--paralelo", type=int, default=4)
     ap.add_argument("--saida", default=str(RAIZ / "runs" / "piloto"))
+    ap.add_argument("--so-relatorio", action="store_true",
+                    help="não chama a API: reavalia as conversas já salvas em --saida e refaz o relatório")
     args = ap.parse_args()
+    saida = Path(args.saida)
+
+    if args.so_relatorio:
+        registros = reavaliar([json.loads(p.read_text()) for p in sorted(saida.glob("*-*.json"))])
+        texto = relatorio(registros)
+        (saida / "relatorio.txt").write_text(texto + "\n")
+        print(texto)
+        return
 
     from dotenv import load_dotenv
     load_dotenv(RAIZ / ".env")
@@ -104,12 +146,13 @@ def main():
     from claude import ClienteSimulado, Professor
 
     api = anthropic.Anthropic(max_retries=4)
-    saida = Path(args.saida)
     saida.mkdir(parents=True, exist_ok=True)
-    registros = rodar_lote(lote(args.inicio, args.n), lambda c: (Professor(api), ClienteSimulado(api, c)),
-                           args.teto_dolares, args.paralelo)
-    for r in registros:
+
+    def gravar(r):
         (saida / f"{r['cenario']['id']}.json").write_text(json.dumps(r, ensure_ascii=False, indent=1))
+
+    registros = rodar_lote(lote(args.inicio, args.n), lambda c: (Professor(api), ClienteSimulado(api, c)),
+                           args.teto_dolares, args.paralelo, ao_terminar=gravar)
     texto = relatorio(registros)
     (saida / "relatorio.txt").write_text(texto + "\n")
     print(texto)

@@ -31,6 +31,20 @@ def test_reembolso_de_item_errado_e_erro_grave():
     assert not r.resolvido and len(r.erros_graves) == 1 and "reembolso" in r.erros_graves[0]
 
 
+def test_reembolso_parcial_de_itens_certos_nao_e_erro_grave():
+    c = cenario("item", [entregue_com_atraso(0, itens=[item("i1"), item("i2")])],
+                itens_problema={"i1": "faltando", "i2": "faltando"})
+    r = avaliar(c, EstadoFinal(reembolsos=frozenset({("P1", frozenset({"i1"}))})), [{"motivo": "x"}])
+    assert r.resolvido is False and r.erros_graves == []
+
+
+def test_reembolso_por_itens_quando_cabia_o_total_nao_e_erro_grave():
+    from fabrica import pedido
+    c = cenario("cancelado_restaurante", [pedido(status="cancelado_restaurante", itens=[item("i1"), item("i2")])])
+    r = avaliar(c, EstadoFinal(reembolsos=frozenset({("P1", frozenset({"i1", "i2"}))})), [])
+    assert r.resolvido is False and r.erros_graves == []
+
+
 def test_faltou_compensar_nao_e_erro_grave():
     r = avaliar(atraso(30), EstadoFinal(), [])
     assert r.resolvido is False and r.erros_graves == []

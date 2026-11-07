@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from modelos import Cenario, Item, Pedido
-from politica import TIPOS
+from politica import TETO_REEMBOLSO, TIPOS
 
 EMPRESA = "Garfo Ligeiro"
 TREINO, TESTE, PILOTO = 0, 1_000_000, 2_000_000
@@ -51,8 +51,8 @@ def _entregue(rng, cliente_id, usados, agora, ha_min, atraso, **kw):
 def _aberto(rng, cliente_id, usados, agora, status, atraso):
     pid, rest, itens = _pedido(rng, cliente_id, usados)
     previsto = agora - _min(atraso)
-    return Pedido(pid, cliente_id, rest, itens, rng.randint(0, 999) // 10 * 10, status,
-                  previsto - _min(rng.randint(30, 60)), previsto)
+    feito = min(previsto - _min(rng.randint(30, 60)), agora - _min(rng.randint(5, 30)))  # nunca depois de agora
+    return Pedido(pid, cliente_id, rest, itens, rng.randint(0, 999) // 10 * 10, status, feito, previsto)
 
 
 def _problemas(rng, itens, teto=8000):
@@ -83,6 +83,9 @@ def gerar(semente: int, tipo: str) -> Cenario:
     elif tipo == "cancelado_restaurante":
         alvo = _aberto(rng, cid, usados, agora, "cancelado_restaurante", rng.randint(0, 60))
         alvo.itens = alvo.itens[:3]
+        if rng.random() < 0.8:  # a maioria fica abaixo do teto, para o tipo testar o reembolso total
+            while len(alvo.itens) > 1 and alvo.total > TETO_REEMBOLSO:
+                alvo.itens.pop()
         alvo.estornado = rng.random() < 0.25
     elif tipo == "item_acima_teto":
         alvo = _entregue(rng, cid, usados, agora, recente, rng.randint(0, 15), n_itens=rng.randint(2, 4),

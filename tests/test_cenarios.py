@@ -47,6 +47,21 @@ def test_cenario_valido():
         assert all(p.cliente_id == c.cliente_id for p in c.pedidos)
 
 
+def test_horarios_coerentes():
+    for c in lote(0, 1400):
+        for p in c.pedidos:
+            assert p.feito_em < c.agora, c.id
+            assert p.feito_em < p.previsto_em, c.id
+            assert p.entregue_em is None or p.feito_em < p.entregue_em <= c.agora, c.id
+
+
+def test_cancelado_restaurante_testa_mais_o_reembolso_que_o_teto():
+    es = [esperado(gerar(s, "cancelado_restaurante")) for s in range(300)]
+    transferidos = sum(e.transferido for e in es) / len(es)
+    assert 0.05 < transferidos < 0.4
+    assert sum(bool(e.reembolsos) for e in es) > len(es) / 2
+
+
 def test_objetivo_e_fatos_para_todo_tipo():
     for tipo in TIPOS:
         c = gerar(3, tipo)

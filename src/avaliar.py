@@ -15,7 +15,13 @@ class Resultado:
 
 def avaliar(c: Cenario, estado: EstadoFinal, bloqueios: list[dict]) -> Resultado:
     e = esperado(c)
-    graves = [f"reembolso sem direito em {p}: {', '.join(sorted(i))}" for p, i in estado.reembolsos - e.reembolsos]
+    devidos = dict(e.reembolsos)
+    graves = []
+    for p, itens in estado.reembolsos:
+        certos = devidos.get(p, frozenset())
+        extra = frozenset() if "todos" in certos else itens - certos  # reembolsar só parte do devido não é grave
+        if extra:
+            graves.append(f"reembolso sem direito em {p}: {', '.join(sorted(extra))}")
     graves += [f"cupom sem direito em {p}: {reais(v)}" for p, v in estado.cupons - e.cupons]
     graves += [f"cancelamento sem direito de {p}" for p in estado.cancelamentos - e.cancelamentos]
     return Resultado(estado == e, sorted(graves), len(bloqueios), estado.transferido == e.transferido)
