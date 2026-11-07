@@ -32,7 +32,7 @@ def resposta(texto="", chamadas=(), fim="stop", entrada=100, saida=20):
 def test_custo_workers_ai():
     assert Uso(PROFESSOR, entrada=1_000_000, saida=1_000_000).custo() == pytest.approx(1.50)
     assert Uso(PROFESSOR, cache_leitura=1_000_000).custo() == pytest.approx(0.006)
-    assert Uso(CLIENTE, entrada=1_000_000, saida=1_000_000).custo() == pytest.approx(0.46)
+    assert CLIENTE == PROFESSOR
 
 
 def test_uso_soma_formato_openai():
@@ -92,8 +92,8 @@ def test_cliente_aberto_encerra_com_fim_e_nao_pede_humano():
     cli = ClienteAberto(api, gerar(1, "status"))
     assert cli.falar(None) == "cadê meu pedido?"
     assert cli.falar("Está a caminho.") is None
-    assert api.chamadas[0]["model"] == CLIENTE == "@cf/zai-org/glm-4.7-flash"
-    assert "reasoning_effort" not in api.chamadas[0]
+    assert api.chamadas[0]["model"] == CLIENTE
+    assert api.chamadas[0]["reasoning_effort"] == "none"  # o cliente só fala; raciocínio é custo à toa
     assert FRASE_HUMANO in api.chamadas[0]["messages"][0]["content"]
     assert [m["role"] for m in api.chamadas[1]["messages"]] == ["system", "user", "assistant", "user"]
     assert FRASE_HUMANO not in ClienteAberto(APIFalsa([]), gerar(1, "humano")).sistema

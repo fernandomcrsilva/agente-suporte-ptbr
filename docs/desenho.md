@@ -75,7 +75,7 @@ A resposta certa vem das regras, não de um LLM **(Fernando)**. A ideia de avali
 
 Um LLM faz o papel do cliente, conversando com o agente. Ele recebe os fatos do cenário e só pode afirmar o que está neles. Assim, não inventa um detalhe que mude a resposta certa. Ele encerra quando o problema foi resolvido ou depois de um limite de turnos (por exemplo, 8).
 
-O modelo do cliente simulado é o **GLM-4.7 Flash**, de licença MIT, no Workers AI da Cloudflare **(minha escolha)**: o papel é simples e as chamadas são muitas. Ele precisa ser aberto pelo mesmo motivo do professor (veja "Como o aluno aprende"), porque as falas dele entram nas conversas de treino.
+O modelo do cliente simulado é o mesmo **DeepSeek V4.1 Flash** do professor, com o raciocínio desligado, no Workers AI da Cloudflare **(minha escolha)**. O GLM-4.7 Flash foi testado e descartado: saía vazio ou num português estranho. Ele precisa ser aberto pelo mesmo motivo do professor (veja "Como o aluno aprende"), porque as falas dele entram nas conversas de treino.
 
 ### O que se compara
 
@@ -104,7 +104,7 @@ Os modelos sem treino recebem o prompt completo do professor, com a política es
 
 1. **O professor atende de verdade.** Ele roda num loop real com as ferramentas do sistema simulado. As respostas das ferramentas vêm sempre do código, nunca do professor.
    - **Mudança de 07/11/2026 (Fernando):** o professor deixou de ser o Claude. A [Política de Uso da Anthropic](https://www.anthropic.com/legal/aup) proíbe usar saídas do Claude para treinar um modelo sem autorização prévia. O professor passou a ser aberto, chamado pelo Workers AI da Cloudflare, que o Fernando já usa no Perry.
-   - A primeira escolha foi o gpt-oss-120b, mas no Workers AI as chamadas de ferramenta dele voltaram quebradas, como marcadores internos no meio do texto, nas três rotas da API. Num teste com uma pergunta, o **DeepSeek V4.1 Flash** e o GLM-4.7 Flash devolveram chamadas certas. Os dois têm licença MIT, que permite treinar com as saídas. O professor é o DeepSeek V4.1 Flash, o mais forte dos dois **(minha escolha)**.
+   - A primeira escolha foi o gpt-oss-120b, mas no Workers AI as chamadas de ferramenta dele voltaram quebradas, como marcadores internos no meio do texto, nas três rotas da API. Num teste com uma pergunta, o **DeepSeek V4.1 Flash** e o GLM-4.7 Flash devolveram chamadas certas. Os dois têm licença MIT, que permite treinar com as saídas. O professor é o DeepSeek V4.1 Flash, o mais forte dos dois **(minha escolha)**, que também faz o papel do cliente.
    - O Claude continua no projeto só para medir: ele é a linha de referência no teste e o juiz da qualidade do texto. Nenhuma saída dele entra no treino.
    - O piloto feito com o Claude serviu para validar o sistema e o loop. Aquelas conversas não entram no treino.
 2. **Só entram no treino as conversas que o professor acertou.** Uma conversa é descartada se o estado final dela diferir do esperado. A taxa de acerto do professor é medida à parte, nos cenários de teste, sem esse filtro.
@@ -144,7 +144,7 @@ A ordem protege os 200 dólares: primeiro tudo que é de graça, depois um pilot
 - **Preços por milhão de tokens, entrada / saída:** Opus 5.5 custa US$ 4 / 20, com leitura de cache a 0,20. Sonnet 5.5 custa US$ 2 / 10, também com cache a 0,20. Haiku 5.5 custa US$ 0,10 / 0,50.
 - **Estimativa grosseira por conversa com o Opus 5.5** (umas 5 chamadas, prompt de sistema de uns 2.500 tokens em cache e raciocínio baixo): perto de US$ 0,06. Pode ser metade disso ou o dobro, e o piloto é que diz.
 - **Piloto com o Claude:** custou US$ 0,96 nas 30 conversas, US$ 0,032 cada. O professor acertou 30 de 30.
-- **Professor aberto:** o DeepSeek V4.1 Flash custa US$ 0,30 por milhão de tokens de entrada (US$ 0,006 em cache) e US$ 1,20 por milhão de saída, e o GLM-4.7 Flash, US$ 0,06 e US$ 0,40. Com o volume de tokens do piloto, cada conversa deve custar perto de US$ 0,01, cobrado na conta da Cloudflare.
+- **Professor aberto:** o DeepSeek V4.1 Flash custa US$ 0,30 por milhão de tokens de entrada (US$ 0,006 em cache) e US$ 1,20 por milhão de saída. Nos testes, cada conversa custou perto de US$ 0,002. Com o volume de tokens do piloto, cada conversa deve custar perto de US$ 0,01, cobrado na conta da Cloudflare.
 - **Divisão sugerida:**
   - a geração de 2.000 conversas de treino custa uns US$ 20 na Cloudflare;
   - até US$ 25 dos créditos da Anthropic vão para a avaliação: o Claude Opus 5.5 como referência nos 300 cenários de teste e o juiz;

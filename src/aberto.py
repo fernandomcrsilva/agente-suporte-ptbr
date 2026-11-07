@@ -1,8 +1,9 @@
 """Professor e cliente simulado abertos, no Workers AI da Cloudflare, no formato de chat da OpenAI.
 
 As conversas de treino saem daqui: a Política de Uso da Anthropic proíbe treinar modelos com saídas do Claude.
-Os dois modelos têm licença MIT. O gpt-oss-120b foi descartado: no Workers AI, as chamadas de ferramenta dele
-voltavam como marcadores internos (`<|channel|>commentary to=functions...`) no meio do texto (teste de 07/11/2026).
+O modelo, nos dois papéis, é o DeepSeek V4.1 Flash, de licença MIT. O gpt-oss-120b foi descartado: no Workers AI, as chamadas de ferramenta dele
+voltavam como marcadores internos (`<|channel|>commentary to=functions...`) no meio do texto, e o GLM-4.7 Flash,
+como cliente, saía vazio ou num português estranho (testes de 07/11/2026).
 """
 import json
 import time
@@ -17,7 +18,7 @@ from prompts import fala_do_agente, professor
 from sistema import ferramentas_openai
 
 PROFESSOR = "@cf/deepseek-ai/deepseek-v4.1-flash-1017"
-CLIENTE = "@cf/zai-org/glm-4.7-flash"
+CLIENTE = PROFESSOR  # sem raciocínio: o cliente só fala
 URL = "https://api.cloudflare.com/client/v4/accounts/{conta}/ai/v1/chat/completions"
 
 
@@ -85,15 +86,16 @@ class ProfessorAberto:
 
 
 class ClienteAberto:
-    def __init__(self, api, c: Cenario, modelo: str = CLIENTE):
-        self.api, self.modelo = api, modelo
+    def __init__(self, api, c: Cenario, modelo: str = CLIENTE, esforco: str = "none"):
+        self.api, self.modelo, self.esforco = api, modelo, esforco
         self.sistema = prompt_cliente(c)
         self.mensagens: list[dict] = [{"role": "system", "content": self.sistema}]
         self.uso = Uso(modelo)
 
     def falar(self, texto_agente: str | None) -> str | None:
         self.mensagens.append({"role": "user", "content": fala_do_agente(texto_agente)})
-        msg = _resposta(self.api.completar(model=self.modelo, messages=self.mensagens, max_tokens=4000), self.uso)
+        msg = _resposta(self.api.completar(model=self.modelo, messages=self.mensagens, reasoning_effort=self.esforco,
+                                           max_tokens=2000), self.uso)
         texto = (msg.get("content") or "").strip()
         self.mensagens.append({"role": "assistant", "content": texto})
         return None if "[FIM]" in texto else texto
