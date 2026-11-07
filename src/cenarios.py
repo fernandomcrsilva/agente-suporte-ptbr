@@ -71,7 +71,7 @@ def gerar(semente: int, tipo: str) -> Cenario:
                                               minutes=rng.randint(0, 59))
     cid, usados = f"C{semente}", set()
     atraso = rng.randint(*rng.choice(FAIXAS_ATRASO))
-    recente = rng.randint(15, 600)  # entregue há 15 min a 10 h
+    recente = rng.randint(15, 240)  # entregue há 15 min a 4 h
     problemas, de_outro = {}, None
 
     if tipo in ("status", "cancelar_tarde"):
