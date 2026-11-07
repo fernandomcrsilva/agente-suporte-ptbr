@@ -10,6 +10,7 @@ PRECOS = {
     "@cf/deepseek-ai/deepseek-v4.1-flash-1017": (0.30, 1.20, 0.006, 0.30),
     "@cf/mistralai/mistral-small-3.1-24b-instruct": (0.351, 0.555, 0.351, 0.351),
     "@cf/openai/gpt-oss-120b": (0.35, 0.75, 0.35, 0.35),
+    "local": (0, 0, 0, 0),  # o aluno e o Qwen sem treino, na GPU de casa
 }
 
 
