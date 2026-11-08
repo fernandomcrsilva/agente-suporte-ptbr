@@ -1,6 +1,7 @@
 """Separa as conversas geradas que podem treinar o aluno e as grava em treino e validação.
 
 uso: python src/exportar.py runs/geracao --saida data/conversas --validacao 0.05
+     cd src && python -c "from pathlib import Path; from exportar import para_hub; print(para_hub(Path('../data/conversas'), Path('../runs/hub-dados')))"
 """
 import argparse
 import json
@@ -40,6 +41,21 @@ def dividir(registros: list[dict], validacao: float, semente: int = 0) -> tuple[
     ids = sorted(r["cenario"]["id"] for r in registros)
     val = set(random.Random(semente).sample(ids, round(len(ids) * validacao)))
     return ([r for r in registros if r["cenario"]["id"] not in val], [r for r in registros if r["cenario"]["id"] in val])
+
+
+def para_hub(origem: Path, destino: Path) -> dict[str, int]:
+    """Cópia para o Hugging Face: cada linha vira {"eventos": [...]}, que o carregador de JSON do Hub lê.
+
+    Os arquivos de data/conversas, que treinaram o aluno, ficam como estão.
+    """
+    destino.mkdir(parents=True, exist_ok=True)
+    contagem = {}
+    for nome in ("treino", "validacao"):
+        linhas = (origem / f"{nome}.jsonl").read_text().splitlines()
+        (destino / f"{nome}.jsonl").write_text(
+            "".join(json.dumps({"eventos": json.loads(l)}, ensure_ascii=False) + "\n" for l in linhas))
+        contagem[nome] = len(linhas)
+    return contagem
 
 
 def main():

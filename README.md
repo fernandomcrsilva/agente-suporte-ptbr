@@ -6,7 +6,7 @@ O aluno aprendeu com conversas de um professor aberto, o DeepSeek V4.1 Flash. O 
 
 - **Demo:** [converse com o agente no Hugging Face](https://huggingface.co/spaces/FMendonca/agente-suporte-ptbr). Você faz o papel do cliente e vê, ao lado, as ferramentas chamadas e o que mudou no sistema. A demo roda o mesmo modelo da primeira linha da tabela abaixo.
 - **Modelos:** o [adaptador LoRA](https://huggingface.co/FMendonca/qwen3-1.7b-agente-suporte-ptbr) e a [versão em GGUF](https://huggingface.co/FMendonca/qwen3-1.7b-agente-suporte-ptbr-gguf).
-- **Dados:** as [1.973 conversas de treino](https://huggingface.co/datasets/FMendonca/conversas-suporte-delivery-ptbr).
+- **Dados:** as [1.973 conversas do professor](https://huggingface.co/datasets/FMendonca/conversas-suporte-delivery-ptbr), 1.874 de treino e 99 de validação.
 
 ## Em um minuto
 
@@ -23,7 +23,7 @@ Cada sistema atendeu os mesmos 300 cenários de teste, que nunca entraram no tre
 \* O tempo do professor inclui a espera do limite de 18 requisições por minuto que o próprio teste impõe ao Workers AI. Ele mostra o ritmo do teste, não a velocidade do modelo.
 
 - **O treino funcionou.** O mesmo Qwen3-1.7B saiu de 53,3% para 85,7% de casos resolvidos. Antes do treino, ele não concedia nada, e por isso não tinha erro grave. Mas, segundo o juiz, em 121 de 293 conversas ele dizia que tinha feito algo que não fez.
-- **O aluno ainda fica atrás do professor** e é o único com erros graves. Nove dos 19 vêm de reclamações de item depois do prazo de 48 horas, onde ele resolveu só 10 de 22 casos. Ele lê a data, sabe a regra e reembolsa assim mesmo.
+- **O aluno ainda fica atrás do professor** e é o único que comete erros graves: 19 no original e 15 no GGUF. Nove dos 19 vêm de reclamações de item depois do prazo de 48 horas, onde ele resolveu só 10 de 22 casos. Ele lê a data, sabe a regra e reembolsa assim mesmo.
 - **Custo zero de API.** O aluno roda em casa. O Claude Opus custaria US$ 0,027 por conversa.
 - **Também roda sem GPU.** Compactado em GGUF Q8_0 (1,83 GB), o aluno resolveu 85,3% dos casos, empatado com o original, e levou 3,2 s por fala numa CPU com 8 threads. A versão menor, Q4_K_M, piorou o atendimento e ficou de fora.
 
@@ -97,7 +97,10 @@ Versões usadas: Python 3.12, torch 2.14.1+rocm7.2, transformers 5.22.2, peft 0.
 
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/rocm7.2   # ou a versão para CUDA
-pip install -r requirements.txt transformers==5.22.2 peft==0.21.2 requests sentencepiece
+pip install -r requirements.txt transformers==5.22.2 peft==0.21.2 requests sentencepiece gradio==6.31.0
+CMAKE_ARGS="-DGGML_NATIVE=ON" pip install --no-binary llama-cpp-python llama-cpp-python==0.3.36   # o GGUF; compila
+git clone https://github.com/ggml-org/llama.cpp && git -C llama.cpp checkout 0c1e570 \
+    && cmake -S llama.cpp -B llama.cpp/build && cmake --build llama.cpp/build --target llama-quantize -j 8
 python -m pytest -q                                                      # política, sistema, loop e avaliação
 python src/piloto.py --inicio 0 --n 2000 --paralelo 4 --teto-dolares 10 --saida runs/geracao   # conversas do professor
 python src/exportar.py runs/geracao --saida data/conversas --validacao 0.05
@@ -108,7 +111,7 @@ python src/piloto.py --agente aluno --adaptador runs/aluno --inicio 1000000 --n 
 python src/juiz.py runs/teste/aluno runs/teste/base runs/teste/aberto runs/teste/claude --saida runs/juiz
 python src/tabela.py                                                     # gera docs/resultados.md
 ADAPTADOR=runs/aluno python demo/app.py                                 # a demo na GPU
-python src/gguf.py --adaptador runs/aluno --llama-cpp caminho/do/llama.cpp --quant Q8_0
+python src/gguf.py --adaptador runs/aluno --llama-cpp llama.cpp --quant Q8_0
 GGUF=runs/gguf/qwen3-1.7b-agente-suporte-ptbr-Q8_0.gguf python demo/app.py   # a demo na CPU
 ```
 

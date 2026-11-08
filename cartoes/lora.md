@@ -35,7 +35,7 @@ O adaptador **não** foi treinado no template de chat nativo do Qwen3. O formato
 - os resultados das ferramentas voltam numa fala `user`, cada um dentro de `<tool_response>`;
 - a primeira fala do cliente vem depois de uma linha de contexto, como `Cliente logado: Ana (C1). Agora: 07/11 20:30.`.
 
-Usar o `apply_chat_template` do Qwen3 no lugar desse formato piora as respostas. O caminho mais curto é usar o código do repositório.
+O modelo nunca viu o formato do `apply_chat_template` do Qwen3, e o resultado com ele não foi medido. O caminho mais curto é usar o código do repositório.
 
 ## Como usar
 

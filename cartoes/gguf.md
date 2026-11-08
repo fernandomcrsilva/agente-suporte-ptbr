@@ -9,7 +9,7 @@ tags: [gguf, llama.cpp, agent, tool-calling, customer-support, portuguese]
 
 # Qwen3-1.7B atendente de suporte, em GGUF para CPU
 
-Esta é a versão em GGUF (Q8_0, 1,83 GB) do [Qwen3-1.7B com LoRA](https://huggingface.co/FMendonca/qwen3-1.7b-agente-suporte-ptbr) que atende o chat de suporte da Garfo Ligeiro, um app de delivery fictício. O LoRA foi fundido no modelo base e convertido com o llama.cpp, para rodar na CPU, sem GPU. A [demo](https://huggingface.co/spaces/FMendonca/agente-suporte-ptbr) roda o adaptador em bf16, que acerta mais.
+Esta é a versão em GGUF (Q8_0, 1,83 GB) do [Qwen3-1.7B com LoRA](https://huggingface.co/FMendonca/qwen3-1.7b-agente-suporte-ptbr) que atende o chat de suporte da Garfo Ligeiro, um app de delivery fictício. O LoRA foi fundido no modelo base e convertido com o llama.cpp, para rodar na CPU, sem GPU. A [demo](https://huggingface.co/spaces/FMendonca/agente-suporte-ptbr) roda o adaptador em bf16, na GPU.
 
 O código, as medições e as limitações estão no [GitHub](https://github.com/fernandomcrsilva/agente-suporte-ptbr).
 
@@ -22,7 +22,7 @@ Um caso conta como resolvido quando o estado final do sistema é igual ao que a 
 | Este GGUF (Q8_0), na CPU com 8 threads | 85,3% (81,3–89,3) | 15 | 3,2 s |
 | O adaptador em bf16, na RX 7600 | 85,7% (81,7–89,3) | 19 | 2,5 s |
 
-Nos 267 cenários em que o cliente simulado abriu a conversa do mesmo jeito nos dois testes, este GGUF e o adaptador em bf16 resolveram o mesmo número de casos: 226. A versão Q4_K_M, menor, perdeu 12 casos que o bf16 resolvia e ganhou só 2, por isso não foi publicada.
+Nos 267 cenários em que o cliente simulado abriu a conversa do mesmo jeito nos dois testes, este GGUF e o adaptador em bf16 resolveram o mesmo número de casos: 226. A versão Q4_K_M, menor, rodou 79 cenários antes de ser descartada. Nos 72 em que a abertura foi igual, ela perdeu 12 casos que o bf16 resolvia e ganhou só 2, por isso não foi publicada.
 
 ## Formato da conversa
 
@@ -30,7 +30,7 @@ O modelo **não** foi treinado no template de chat nativo do Qwen3, que vem embu
 
 ## Como usar
 
-O exemplo usa o llama-cpp-python e o repositório clonado. Não precisa de GPU nem de torch.
+O exemplo usa o repositório clonado e precisa de `pip install llama-cpp-python==0.3.36 transformers==5.22.2 huggingface_hub`. O llama-cpp-python compila na instalação, o que leva alguns minutos. Não precisa de GPU nem de torch.
 
 ```python
 # git clone https://github.com/fernandomcrsilva/agente-suporte-ptbr && cd agente-suporte-ptbr/src

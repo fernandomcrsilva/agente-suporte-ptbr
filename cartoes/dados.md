@@ -5,6 +5,13 @@ task_categories: [text-generation]
 tags: [synthetic, customer-support, tool-calling, agent, portuguese]
 size_categories: [1K<n<10K]
 pretty_name: Conversas de suporte de delivery em português
+configs:
+  - config_name: default
+    data_files:
+      - split: train
+        path: treino.jsonl
+      - split: validation
+        path: validacao.jsonl
 ---
 
 # Conversas de suporte de um delivery fictício, com chamadas de ferramenta
@@ -23,16 +30,23 @@ Nenhuma conversa foi escrita pelo Claude, que no projeto só serve de referênci
 
 ## Arquivos
 
-| Arquivo | Conversas |
-|---|---|
-| `treino.jsonl` | 1.874 |
-| `validacao.jsonl` | 99 |
+| Arquivo | Split | Conversas |
+|---|---|---|
+| `treino.jsonl` | `train` | 1.874 |
+| `validacao.jsonl` | `validation` | 99 |
+
+```python
+from datasets import load_dataset
+
+conversas = load_dataset("FMendonca/conversas-suporte-delivery-ptbr")
+print(conversas["train"][0]["eventos"][1])  # a primeira fala do cliente
+```
 
 As conversas têm 1.412 tokens em média no formato de treino do Qwen3, e a maior tem 2.945.
 
 ## Formato
 
-Cada linha é uma lista de eventos em JSON, na ordem da conversa:
+Cada linha é um objeto JSON com um campo, `eventos`: a lista de eventos da conversa, em ordem.
 
 | `papel` | Campos |
 |---|---|

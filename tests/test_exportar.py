@@ -1,6 +1,8 @@
+import json
+
 import pytest
 
-from exportar import dividir, limpar, selecionar, verificar_sementes
+from exportar import dividir, limpar, para_hub, selecionar, verificar_sementes
 
 
 def registro(id, resolvido=True, fim="cliente_encerrou", status="ok", eventos=None, semente=0):
@@ -48,3 +50,14 @@ def test_recusa_semente_de_teste():
     verificar_sementes([registro("a", semente=5)])
     with pytest.raises(ValueError, match="1000005"):
         verificar_sementes([registro("a", semente=5), registro("b", semente=1_000_005)])
+
+
+def test_para_hub_embrulha_cada_conversa(tmp_path):
+    origem, destino = tmp_path / "conversas", tmp_path / "hub"
+    origem.mkdir()
+    conversa = [{"papel": "cliente", "texto": "oi"}, {"papel": "agente", "texto": "Olá!", "chamadas": []}]
+    (origem / "treino.jsonl").write_text(json.dumps(conversa) + "\n" + json.dumps(conversa) + "\n")
+    (origem / "validacao.jsonl").write_text(json.dumps(conversa) + "\n")
+    assert para_hub(origem, destino) == {"treino": 2, "validacao": 1}
+    linhas = (destino / "treino.jsonl").read_text().splitlines()
+    assert [json.loads(l) for l in linhas] == [{"eventos": conversa}] * 2
