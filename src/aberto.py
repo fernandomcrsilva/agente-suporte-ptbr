@@ -113,15 +113,17 @@ class ProfessorAberto:
 
 
 class ClienteAberto:
-    def __init__(self, api, c: Cenario, modelo: str = CLIENTE):
+    def __init__(self, api, c: Cenario, modelo: str = CLIENTE, temperatura: float | None = None):
         self.api, self.modelo = api, modelo
+        self.extra = {} if temperatura is None else {"temperature": temperatura}
         self.sistema = prompt_cliente(c)
         self.mensagens: list[dict] = [{"role": "system", "content": self.sistema}]
         self.uso = Uso(modelo)
 
     def falar(self, texto_agente: str | None) -> str | None:
         self.mensagens.append({"role": "user", "content": fala_do_agente(texto_agente)})
-        msg = _resposta(self.api.completar(model=self.modelo, messages=self.mensagens, max_tokens=1000), self.uso)
+        msg = _resposta(self.api.completar(model=self.modelo, messages=self.mensagens, max_tokens=1000,
+                                           **self.extra), self.uso)
         texto = (msg.get("content") or "").strip()
         self.mensagens.append({"role": "assistant", "content": texto})
         return None if "[FIM]" in texto else texto

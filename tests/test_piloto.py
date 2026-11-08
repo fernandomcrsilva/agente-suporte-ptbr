@@ -1,6 +1,7 @@
 from cenarios import PILOTO, lote
 from claude import Uso
 from conversa import Recusa
+import piloto
 from piloto import relatorio, rodar_lote
 
 
@@ -23,13 +24,13 @@ class AgenteFalso:
 
 
 class ClienteFalso:
-    def __init__(self):
-        self.uso, self.falou = Uso("claude-haiku-5-5"), False
+    def __init__(self, falas=1):
+        self.uso, self.falas = Uso("claude-haiku-5-5"), falas
 
     def falar(self, texto):
-        if self.falou:
+        if not self.falas:
             return None
-        self.falou = True
+        self.falas -= 1
         return "oi"
 
 
@@ -103,3 +104,24 @@ def test_relatorio():
     assert "conversas: 2 (ok 2, recusadas 0, falhas 0)" in texto
     assert "acerto do professor: " in texto and "por tipo:" in texto
     assert "1.500 conversas" in texto and "Sonnet 5.5" in texto
+
+
+def test_tempos_por_passo():
+    regs = rodar_lote(lote(PILOTO, 1), lambda c: (AgenteFalso(), ClienteFalso(falas=2)), 100, 1)
+    assert len(regs[0]["tempos_agente"]) == 2
+    assert all(t >= 0 for t in regs[0]["tempos_agente"])
+
+
+def test_relatorio_mostra_tempo():
+    regs = rodar_lote(lote(PILOTO, 2), lambda c: (AgenteFalso(), ClienteFalso()), 100, 1)
+    assert "tempo por fala do agente: mediana " in relatorio(regs)
+
+
+def test_falta_de_memoria_vira_falha_e_segue(monkeypatch):
+    liberou = []
+    monkeypatch.setattr(piloto, "_liberar_gpu", lambda: liberou.append(True))
+    cs = lote(PILOTO, 2)
+    regs = rodar_lote(cs, lambda c: (AgenteFalso(RuntimeError("CUDA out of memory") if c is cs[0] else None),
+                                     ClienteFalso()), 100, 1)
+    assert [r["status"] for r in regs] == ["falha", "ok"]
+    assert liberou == [True]

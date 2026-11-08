@@ -1,11 +1,15 @@
-"""Piloto: algumas conversas do professor para medir custo e acerto antes do gasto grande.
+"""Roda lotes de conversas e mede acerto, custo e tempo: o piloto, a geração de treino e o teste.
 
 uso: python src/piloto.py --n 30 --inicio 2000000 --teto-dolares 10 --paralelo 4
+     python src/piloto.py --agente aluno --adaptador runs/aluno --inicio 1000000 --n 300 --temperatura-cliente 0 \
+         --saida runs/teste/aluno
 """
 import argparse
 import json
 import os
+import statistics
 import sys
+import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import asdict
 from pathlib import Path
@@ -47,8 +51,23 @@ def _falha(c, erro) -> dict:
             "uso": {"agente": asdict(Uso("claude-opus-5-5")), "cliente": asdict(Uso("claude-haiku-5-5"))}}
 
 
+def _liberar_gpu():
+    import torch
+    torch.cuda.empty_cache()
+
+
 def _uma(c, fabrica) -> dict:
     agente, cliente = fabrica(c)
+    tempos, passo = [], agente.passo
+
+    def cronometrado(entrada):
+        t = time.perf_counter()
+        try:
+            return passo(entrada)
+        finally:
+            tempos.append(time.perf_counter() - t)
+
+    agente.passo = cronometrado
     reg = {"cenario": c.to_dict(), "status": "ok", "esperado": estado_dict(esperado(c))}
     try:
         conv = rodar(c, agente, cliente)
@@ -57,7 +76,10 @@ def _uma(c, fabrica) -> dict:
     except Recusa as e:
         reg.update(status="recusada", erro=str(e))
     except Exception as e:  # ponytail: uma conversa que falha não derruba o lote; o erro fica registrado
+        if "out of memory" in str(e):
+            _liberar_gpu()  # a próxima conversa começa com a memória da GPU livre
         reg.update(status="falha", erro=f"{type(e).__name__}: {e}")
+    reg["tempos_agente"] = tempos
     reg["uso"] = {"agente": asdict(agente.uso), "cliente": asdict(cliente.uso)}
     reg["custo"] = agente.uso.custo() + cliente.uso.custo()
     return reg
@@ -127,6 +149,10 @@ def relatorio(registros: list[dict]) -> str:
         *[f"  {tipo}: {d['resolvidos']}/{d['n']}" + (f", {d['erros_graves']} erro(s) grave(s)" if d["erros_graves"] else "")
           for tipo, d in sorted(s["por_tipo"].items())],
     ]
+    tempos = [t for r in ok for t in r.get("tempos_agente", [])]
+    if tempos:
+        linhas.append(f"tempo por fala do agente: mediana {_br(statistics.median(tempos), 1)} s "
+                      f"(máximo {_br(max(tempos), 1)} s)")
     modelo = registros[0]["uso"]["agente"]["modelo"]
     for total in (1500, 2000):
         linha = f"estimativa para {_br(total, 0)} conversas: US$ {_br(total * (agente + cliente) / n, 0)} (medido, {modelo})"
@@ -143,12 +169,17 @@ def main():
     ap.add_argument("--inicio", type=int, default=PILOTO)
     ap.add_argument("--teto-dolares", type=float, default=10)
     ap.add_argument("--paralelo", type=int, default=4)
-    ap.add_argument("--professor", choices=("aberto", "claude"), default="aberto",
-                    help="aberto: gpt-oss no Workers AI, que pode gerar dados de treino; claude: só para medir")
+    ap.add_argument("--agente", choices=("aberto", "claude", "aluno", "base"), default="aberto",
+                    help="aberto: DeepSeek no Workers AI, o único que gera dados de treino; claude: Opus, só para medir; "
+                         "aluno: Qwen3 com o LoRA de --adaptador; base: Qwen3 sem treino, com o prompt do professor")
+    ap.add_argument("--adaptador", help="pasta do LoRA, obrigatória com --agente aluno")
+    ap.add_argument("--temperatura-cliente", type=float, help="temperatura do cliente simulado (0 no teste)")
     ap.add_argument("--saida", default=str(RAIZ / "runs" / "piloto"))
     ap.add_argument("--so-relatorio", action="store_true",
                     help="não chama a API: reavalia as conversas já salvas em --saida e refaz o relatório")
     args = ap.parse_args()
+    if args.agente == "aluno" and not args.adaptador:
+        ap.error("--agente aluno precisa de --adaptador")
     saida = Path(args.saida)
 
     if args.so_relatorio:
@@ -160,20 +191,28 @@ def main():
 
     from dotenv import load_dotenv
     load_dotenv(RAIZ / ".env")
-    if args.professor == "claude":  # só para medir: saídas do Claude não podem treinar modelos (Política de Uso)
+    # O cliente é sempre o mesmo (Mistral no Workers AI), para a comparação entre agentes ser justa.
+    faltam = [v for v in ("CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN") if not os.environ.get(v)]
+    if faltam:
+        sys.exit(f"Falta {' e '.join(faltam)} no arquivo .env na raiz do repositório.")
+    from aberto import LIMITES, ClienteAberto, ProfessorAberto, WorkersAI
+    api = WorkersAI(os.environ["CLOUDFLARE_ACCOUNT_ID"], os.environ["CLOUDFLARE_API_TOKEN"], limites=LIMITES)
+    cliente = lambda c: ClienteAberto(api, c, temperatura=args.temperatura_cliente)  # noqa: E731
+    if args.agente == "claude":  # só para medir: saídas do Claude não podem treinar modelos (Política de Uso)
         if not os.environ.get("ANTHROPIC_API_KEY"):
             sys.exit("Falta ANTHROPIC_API_KEY no arquivo .env na raiz do repositório.")
         import anthropic
-        from claude import ClienteSimulado, Professor
-        api = anthropic.Anthropic(max_retries=4)
-        fabrica = lambda c: (Professor(api), ClienteSimulado(api, c))  # noqa: E731
+        from claude import Professor
+        anth = anthropic.Anthropic(max_retries=4)
+        fabrica = lambda c: (Professor(anth), cliente(c))  # noqa: E731
+    elif args.agente in ("aluno", "base"):
+        from aluno import SISTEMA_ALUNO, AgenteQwen, ModeloQwen, sistema_completo
+        qwen = ModeloQwen(adaptador=args.adaptador if args.agente == "aluno" else None)  # carregado uma vez só
+        sistema = SISTEMA_ALUNO if args.agente == "aluno" else sistema_completo()
+        fabrica = lambda c: (AgenteQwen(qwen, sistema), cliente(c))  # noqa: E731
+        args.paralelo = 1  # uma GPU, um modelo
     else:
-        faltam = [v for v in ("CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN") if not os.environ.get(v)]
-        if faltam:
-            sys.exit(f"Falta {' e '.join(faltam)} no arquivo .env na raiz do repositório.")
-        from aberto import LIMITES, ClienteAberto, ProfessorAberto, WorkersAI
-        api = WorkersAI(os.environ["CLOUDFLARE_ACCOUNT_ID"], os.environ["CLOUDFLARE_API_TOKEN"], limites=LIMITES)
-        fabrica = lambda c: (ProfessorAberto(api), ClienteAberto(api, c))  # noqa: E731
+        fabrica = lambda c: (ProfessorAberto(api), cliente(c))  # noqa: E731
     saida.mkdir(parents=True, exist_ok=True)
 
     def gravar(r):

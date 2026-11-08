@@ -158,3 +158,12 @@ def test_workers_ai_espaca_as_chamadas_do_modelo_com_limite():
         api.completar(model="lento")
     api.completar(model="rapido")  # modelo sem limite configurado não espera
     assert esperas == [pytest.approx(1.0), pytest.approx(1.0)]
+
+
+def test_cliente_com_temperatura():
+    api = APIFalsa([resposta("oi")])
+    ClienteAberto(api, gerar(1, "status"), temperatura=0).falar(None)
+    assert api.chamadas[0]["temperature"] == 0
+    api = APIFalsa([resposta("oi")])
+    ClienteAberto(api, gerar(1, "status")).falar(None)
+    assert "temperature" not in api.chamadas[0]
