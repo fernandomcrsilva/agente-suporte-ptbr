@@ -52,3 +52,20 @@ Antes disso, dois testes descartaram modelos:
 - o GLM-4.7 Flash, como cliente, saiu vazio ou num português estranho.
 
 Ao ler cinco conversas, o professor rastreou o pedido antes de decidir, recusou o pedido de R$ 500, deu uma compensação só por pedido, negou com educação o pedido de outra pessoa e transferiu os casos de teto e de "não chegou". Só uma fala do agente, nas 30 conversas, trouxe texto junto de uma chamada de ferramenta.
+
+## Treino do aluno (08/11/2026)
+
+O aluno é o Qwen3-1.7B com LoRA de posto 16 nas sete projeções. Ele treinou com as conversas do professor aberto que deram certo e terminaram de verdade. As conversas de teste ficaram de fora: a exportação barra qualquer semente a partir de 1.000.000.
+
+| Medida | Valor |
+|---|---|
+| Conversas aproveitáveis | 1.973 de 2.000 (98,7%) |
+| Treino e validação | 1.874 e 99 conversas |
+| Tamanho das conversas | 1.412 tokens em média, 2.945 na maior |
+| Passos de otimização | 235 (2 épocas, batch 2 com acumulação de 8, taxa 2e-4) |
+| Perda de validação | 2,066 antes de treinar e 0,367 no fim |
+| Perda de treino no fim | 0,296 |
+| Tempo total | 1 h 59 min, 30,4 s por passo |
+| Pico de VRAM | 5,55 GB, na RX 7600 de 8 GB |
+
+A perda de validação caiu rápido até o passo 50 (0,533) e depois devagar: 0,425 no passo 100, 0,385 no 150, 0,370 no 200. A distância entre treino e validação ficou pequena, sem sinal de que o aluno decorou as conversas.
