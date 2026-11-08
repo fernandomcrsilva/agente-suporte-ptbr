@@ -85,7 +85,7 @@ class Sistema:
             return {"erro": f"ferramenta desconhecida: {nome}"}
         try:
             return getattr(self, nome)(**args)
-        except (KeyError, TypeError, ValueError) as e:
+        except (KeyError, TypeError, ValueError, ArithmeticError) as e:  # ArithmeticError: valor infinito vindo do JSON
             return {"erro": f"argumentos inválidos: {e}"}
 
     def estado_final(self) -> EstadoFinal:

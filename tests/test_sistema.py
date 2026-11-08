@@ -1,3 +1,5 @@
+import json
+
 from fabrica import cenario, entregue_com_atraso, item, pedido, antes
 from modelos import EstadoFinal, reais
 from sistema import NOMES, Sistema, ferramentas_anthropic, ferramentas_qwen
@@ -115,3 +117,10 @@ def test_ferramentas_sao_strict():
         assert t["strict"] is True
         assert t["input_schema"]["additionalProperties"] is False
         assert set(t["input_schema"]["required"]) == set(t["input_schema"]["properties"])
+
+
+def test_cupom_infinito_vira_erro():
+    s = sistema(entregue_com_atraso(0))
+    for valor in (float("inf"), json.loads("1e400")):  # o json.loads aceita os dois
+        assert "erro" in s.executar("emitir_cupom", {"pedido_id": "P1", "valor": valor})
+    assert s.estado_final() == EstadoFinal()
