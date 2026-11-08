@@ -25,6 +25,18 @@ Estas são as decisões que tomei durante a execução do plano, onde o plano ou
 6. **Falha e recusa contam como não resolvidas.** Senão, um sistema que cai pareceria melhor. A tabela tem uma coluna de recusadas: das 11, 10 vieram do cliente simulado, cuja fala passou de 1.000 tokens. O Qwen sem treino teve 7 delas e pode aparecer até 2,3 pontos abaixo do que seria.
 7. **Os registros não guardam o agente nem a temperatura do cliente.** A temperatura 0 foi conferida nos comandos que rodaram os quatro testes. A tabela recusa comparar sistemas com cenários diferentes. O custo é que um teste futuro com outra temperatura passaria sem aviso.
 
+## Decisões do plano 3 (GGUF, demo e publicação)
+
+1. **Nomes e licenças.** Os modelos ficam em `FMendonca/qwen3-1.7b-agente-suporte-ptbr` (LoRA) e `FMendonca/qwen3-1.7b-agente-suporte-ptbr-gguf`, sob Apache 2.0, a licença do Qwen3. As conversas vão para `FMendonca/conversas-suporte-delivery-ptbr`, sob CC BY 4.0. A demo vai para o Space `FMendonca/agente-suporte-ptbr`. Trocar um nome depois de publicar quebra os links entre README, cartões e Space.
+2. **llama-cpp-python compilado do código.** A roda pronta mais nova para CPU (0.3.19) vem ligada à musl e não carrega aqui. Usei a 0.3.36, compilada, e o llama.cpp no mesmo commit dela (`0c1e570`) para converter e quantizar. O custo é que quem quiser rodar o GGUF pelo código do projeto também compila o llama-cpp-python, o que leva alguns minutos.
+3. **Q8_0 em vez de Q4_K_M.** O plano pedia o Q4_K_M se ele resolvesse pelo menos 81,7% dos 300 cenários. Parei o Q4 em 79 cenários: nos 72 em que o cliente abriu a conversa com a mesma fala, ele resolveu 55, contra 65 do aluno em bf16. Ele perdeu 12 casos que o bf16 resolvia e ganhou 2. O Q8_0 tem 1,83 GB, contra 1,11 GB, e é mais lento na CPU. O custo, se a queda fosse ruído, é um arquivo maior e mais lento do que precisava.
+4. **O GGUF não passa pelo juiz.** O estado final já mostra se a compactação piorou o atendimento, e o juiz custaria cerca de US$ 1,20 na Anthropic. Na tabela, a linha do GGUF sai sem nota de texto.
+5. **A demo usa sementes escolhidas por caso.** O atraso usa a semente 3.000.007, com 72 minutos de atraso e cupom de R$ 20. A 3.000.000 atrasava só 5 minutos, e a demo não mostrava nenhuma ação. A demo não é avaliação, então escolher a semente não muda nenhum número.
+6. **O caso do prazo de 48 horas está na demo de propósito.** É o ponto fraco medido do aluno, e a conferência pela política mostra o erro grave quando ele reembolsa. O custo é que o recrutador pode ver o agente errar.
+7. **Na CPU, a demo aquece o prompt de sistema ao abrir.** Com 2 threads, a primeira fala custava 14,9 s, quase todos lendo o prompt fixo. Agora o GGUF lê esse prompt antes de a página abrir. O custo são alguns segundos a mais na abertura.
+8. **A demo roda no ZeroGPU (decisão do Fernando).** O desenho previa a CPU gratuita, mas hoje um Space Gradio em CPU exige o plano PRO, que é pago. Contas gratuitas podem ter até 2 Spaces no ZeroGPU. Lá, a demo roda o aluno em bf16 com o LoRA, o mesmo modelo avaliado. Cada visitante sem login tem 2 minutos de GPU por dia, e com login gratuito são 5. O GGUF continua publicado para quem quer rodar na CPU.
+9. **A linha do Qwen3-8B sem treino ficou de fora.** Era opcional no desenho. A comparação com o mesmo Qwen3-1.7B sem treino já mostra o efeito do treino.
+
 ## Pequenos ajustes que ficaram para depois
 
 Achados da revisão final e da leitura do piloto. Nenhum afeta o resultado do piloto.
