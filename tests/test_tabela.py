@@ -51,3 +51,11 @@ def test_recusa_sistemas_com_cenarios_diferentes():
 def test_avisa_que_tempo_do_aberto_inclui_a_espera():
     assert "espera" not in tabela({"aluno": [reg(1)]}, {})
     assert "18 requisições por minuto" in tabela({"aberto": [reg(1)]}, {})
+
+
+def test_mostra_quantas_foram_recusadas():
+    texto = tabela({"base": [reg(1), reg(2, status="recusada"), reg(3, status="recusada")]}, {})
+    cabecalho, separador, linha = texto.splitlines()[:3]
+    colunas = [c.strip() for c in cabecalho.strip("|").split("|")]
+    assert colunas[2] == "Recusadas" and linha.split("|")[3].strip() == "2"
+    assert separador.count("---") == len(colunas)

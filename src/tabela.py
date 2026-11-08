@@ -45,7 +45,8 @@ def _linha(nome: str, regs: list[dict], notas: list[dict]) -> str:
     custo = sum(Uso(**r["uso"]["agente"]).custo() for r in regs) / n
     tempos = [t for r in ok for t in r.get("tempos_agente", [])]
     tempo = _br(statistics.median(tempos), 1) if tempos else "—"
-    return (f"| {nome} | {_pct(sum(resolvidos) / n)} ({_br(100 * baixo, 1)}–{_br(100 * alto, 1)}) | "
+    recusadas = sum(r["status"] == "recusada" for r in regs)
+    return (f"| {nome} | {_pct(sum(resolvidos) / n)} ({_br(100 * baixo, 1)}–{_br(100 * alto, 1)}) | {recusadas} | "
             f"{t['erros_graves']} | {t['bloqueios']} | {_pct(t['transferencias_certas'] / n)} | {juiz} | "
             f"{promessas} | {_br(custo, 4)} | {tempo} |")
 
@@ -57,10 +58,10 @@ def tabela(sistemas: dict[str, list[dict]], juiz: dict[str, list[dict]]) -> str:
     if diferentes:  # um teste pela metade ou com outras sementes não entra na comparação
         raise ValueError(f"cenários diferentes de {nomes[0]} em: {', '.join(diferentes)}")
     linhas = [
-        "| Sistema | Resolvidos (IC 95%) | Erros graves | Tentativas bloqueadas | Transferências certas | "
+        "| Sistema | Resolvidos (IC 95%) | Recusadas | Erros graves | Tentativas bloqueadas | Transferências certas | "
         "Clareza / tom (juiz, 1 a 5) | Promessas sem cumprir (juiz) | Custo do agente por conversa (US$) | "
         "Tempo por fala (mediana, s) |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|",
         *[_linha(s, sistemas[s], juiz.get(s, [])) for s in nomes],
         "",
         *(["O tempo do aberto inclui a espera do limite de 18 requisições por minuto que o próprio teste impõe ao "
@@ -98,6 +99,9 @@ def main():
         "",
         "- **Resolvidos:** o estado final (reembolsos, cupons, cancelamentos e transferência) é igual ao que a "
         "política manda. Conversas que falharam contam como não resolvidas. O intervalo de 95% vem de bootstrap.",
+        "- **Recusadas:** a conversa parou porque a resposta de um modelo foi cortada no limite de tokens. Elas "
+        "contam como não resolvidas. Neste teste, 10 das 11 vieram do cliente simulado, cuja fala passou de 1.000 "
+        "tokens, e só uma veio de um agente: o Claude, que passou de 8.000.",
         "- **Erros graves:** o agente deu algo que o cliente não tinha direito de receber.",
         "- **Tentativas bloqueadas:** o agente tentou passar de um limite e o sistema barrou.",
         "- **Juiz:** o Claude Sonnet 5.5 leu cada conversa às cegas, sem saber qual sistema atendeu, e deu nota só ao "

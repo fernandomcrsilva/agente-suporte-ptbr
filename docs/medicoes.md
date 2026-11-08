@@ -79,3 +79,15 @@ Li três conversas do aluno: uma certa e duas erradas.
 - **Errada (atraso-1000029):** o atraso foi de 14 minutos. O aluno escreveu que "atrasos de até 20 minutos não geram compensação, mas emiti um cupom de R$ 10". Ele sabe a regra e mesmo assim dá o cupom, uma contradição. O professor não teve nenhum erro grave nas 299 conversas do teste.
 
 Os dois erros são do mesmo tipo: o aluno lê o limite certo e concede assim mesmo. Nos dois casos, o sistema não barrou nada, porque o reembolso e o cupom ficaram dentro dos tetos das ferramentas.
+
+## Teste dos quatro sistemas (08/11/2026)
+
+A tabela completa está em [`resultados.md`](resultados.md). O que ela mostra:
+
+- **O treino funcionou.** O aluno resolveu 85,7% das 300 conversas. O mesmo Qwen sem treino, com a política inteira no prompt, resolveu 53,3%. O juiz deu ao aluno 4,4 de clareza, contra 1,8 do Qwen sem treino.
+- **O aluno ainda fica atrás do professor**, que resolveu 98,0%. O aluno é o único com erros graves: 19, contra 0 dos outros três.
+- **Os erros graves do aluno se concentram num ponto.** Nove dos 19 são reembolsos de item reclamado depois do prazo de 48 horas: no item_fora_prazo, ele acertou só 10 de 22. Os outros 10 vêm de cancelado_restaurante (4), dois_problemas (4) e atraso (2). É o mesmo padrão das conversas lidas: ele vê o limite e concede assim mesmo.
+- **O Qwen sem treino erra pelo outro lado.** Não dá nada a ninguém, por isso acerta 100% no item_fora_prazo e tem 0 erro grave. Mas em 121 de 293 conversas, segundo o juiz, ele diz que fez algo que não fez.
+- **Custo e tempo.** O aluno roda na RX 7600 com 2,5 s por fala e custo zero de API. O Claude Opus custou US$ 0,027 por conversa. O tempo do aberto (12,7 s) inclui a espera do limite que o próprio teste impõe, e não é a velocidade do modelo.
+
+Gasto da avaliação na Anthropic: US$ 8,14 no Claude Opus e US$ 4,74 no juiz, somando US$ 12,88 dos US$ 25 previstos. No Workers AI, foram US$ 0,95: o professor aberto e o cliente simulado dos quatro testes.
