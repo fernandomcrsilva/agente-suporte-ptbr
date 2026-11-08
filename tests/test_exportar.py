@@ -1,8 +1,10 @@
-from exportar import dividir, limpar, selecionar
+import pytest
+
+from exportar import dividir, limpar, selecionar, verificar_sementes
 
 
-def registro(id, resolvido=True, fim="cliente_encerrou", status="ok", eventos=None):
-    return {"cenario": {"id": id}, "status": status, "motivo_fim": fim, "resultado": {"resolvido": resolvido},
+def registro(id, resolvido=True, fim="cliente_encerrou", status="ok", eventos=None, semente=0):
+    return {"cenario": {"id": id, "semente": semente}, "status": status, "motivo_fim": fim, "resultado": {"resolvido": resolvido},
             "eventos": eventos or [{"papel": "cliente", "texto": "oi"}, {"papel": "agente", "texto": "Olá!", "chamadas": []}]}
 
 
@@ -40,3 +42,9 @@ def test_divide_sem_repetir_e_sempre_igual():
     assert len(val) == 10 and len(treino) == 90
     assert not {r["cenario"]["id"] for r in treino} & {r["cenario"]["id"] for r in val}
     assert dividir(regs, 0.1) == (treino, val)
+
+
+def test_recusa_semente_de_teste():
+    verificar_sementes([registro("a", semente=5)])
+    with pytest.raises(ValueError, match="1000005"):
+        verificar_sementes([registro("a", semente=5), registro("b", semente=1_000_005)])

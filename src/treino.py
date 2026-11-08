@@ -2,7 +2,7 @@
 
 Adaptado do train_lora.py do review-aspects-ptbr: a perda continua só nas falas do agente, agora em várias por conversa.
 
-uso: python src/treino.py --conversas runs/geracao/treino.jsonl --out runs/aluno
+uso: python src/treino.py --conversas data/conversas/treino.jsonl --validacao data/conversas/validacao.jsonl --out runs/aluno
      python src/treino.py --falsas 3000 --passos 20 --batch 1 --accum 1 --out runs/teste-memoria   # teste de memória
 """
 import argparse
@@ -56,6 +56,7 @@ def conversas_falsas(n: int, tokens: int, tok) -> list[list[dict]]:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--conversas", help="JSONL, uma lista de eventos por linha")
+    ap.add_argument("--validacao", help="JSONL de validação: perda medida no início, a cada 50 passos e no fim")
     ap.add_argument("--falsas", type=int, default=0, help="gera conversas falsas com pelo menos N tokens")
     ap.add_argument("--n-falsas", type=int, default=16)
     ap.add_argument("--out", required=True)
@@ -80,6 +81,10 @@ def main():
         with open(args.conversas) as f:
             conversas = [json.loads(l) for l in f if l.strip()]
     enc = [renderizar(ev, tok) for ev in conversas]
+    enc_val = []
+    if args.validacao:
+        with open(args.validacao) as f:
+            enc_val = [renderizar(json.loads(l), tok) for l in f if l.strip()]
 
     model = AutoModelForCausalLM.from_pretrained(args.model, dtype=dtype).to(dev)
     model.gradient_checkpointing_enable()
@@ -90,11 +95,12 @@ def main():
     model.print_trainable_parameters()
     base = model.get_base_model()
 
-    def batches():
-        order = list(range(len(enc)))
-        random.shuffle(order)
+    def batches(lista, embaralhar=True):
+        order = list(range(len(lista)))
+        if embaralhar:
+            random.shuffle(order)
         for i in range(0, len(order), args.batch):
-            chunk = [enc[j] for j in order[i:i + args.batch]]
+            chunk = [lista[j] for j in order[i:i + args.batch]]
             n = -(-max(len(x) for x, _ in chunk) // 32) * 32  # poucos formatos distintos: o ROCm escolhe kernel por formato
             ids = torch.full((len(chunk), n), tok.pad_token_id)
             mask = torch.zeros((len(chunk), n), dtype=torch.long)
@@ -105,12 +111,25 @@ def main():
                 labels[k, :len(r)] = torch.tensor(r)
             yield ids.to(dev), mask.to(dev), labels.to(dev)
 
-    def loss_fn(ids, mask, labels):
+    def loss_fn(ids, mask, labels, reducao="mean"):
         # Logits só nas posições das falas do agente: o vocabulário de 151k estouraria os 8 GB na conversa inteira.
         h = base.model(input_ids=ids, attention_mask=mask).last_hidden_state[:, :-1]
         y = labels[:, 1:]
         keep = y != -100
-        return torch.nn.functional.cross_entropy(base.lm_head(h[keep]).float(), y[keep])
+        return torch.nn.functional.cross_entropy(base.lm_head(h[keep]).float(), y[keep], reduction=reducao)
+
+    def validar(step):
+        """Perda média por token das falas do agente na validação, na ordem do arquivo."""
+        if not enc_val:
+            return
+        model.eval()
+        soma, n = 0.0, 0
+        with torch.no_grad():
+            for ids, mask, labels in batches(enc_val, embaralhar=False):
+                soma += loss_fn(ids, mask, labels, "sum").item()
+                n += int((labels[:, 1:] != -100).sum())
+        model.train()
+        print(f"validação passo {step} | perda {soma / n:.4f}", flush=True)
 
     steps = math.ceil(len(enc) / args.batch * args.epochs / args.accum)
     if args.passos:
@@ -120,12 +139,17 @@ def main():
         opt, lambda s: min(1.0, (s + 1) / 20) * 0.5 * (1 + math.cos(math.pi * min(s, steps) / steps)))
 
     tokens = sum(len(x) for x, _ in enc) / len(enc)
-    print(f"{len(enc)} conversas | {tokens:.0f} tokens por conversa em média | {steps} passos de otimização")
+    maior = max(len(x) for x, _ in enc)
+    print(f"{len(enc)} conversas | {tokens:.0f} tokens por conversa em média, {maior} na maior | "
+          f"{len(enc_val)} de validação | {steps} passos de otimização", flush=True)
     model.train()
-    step, micro, t0 = 0, 0, time.time()
+    validar(0)
+    step, micro, t0, perdas = 0, 0, time.time(), []
     while step < steps:
-        for b in batches():
-            (loss_fn(*b) / args.accum).backward()
+        for b in batches(enc):
+            loss = loss_fn(*b)
+            (loss / args.accum).backward()
+            perdas.append(loss.item())
             micro += 1
             if micro % args.accum:
                 continue
@@ -133,11 +157,16 @@ def main():
             opt.step(); sched.step(); opt.zero_grad()
             step += 1
             if step % 10 == 0 or step == steps:
-                print(f"passo {step}/{steps} | {time.time() - t0:.0f}s", flush=True)
+                print(f"passo {step}/{steps} | perda de treino {sum(perdas) / len(perdas):.4f} | "
+                      f"{time.time() - t0:.0f}s", flush=True)
+                perdas = []
+            if step % 50 == 0 and step < steps:
+                validar(step)
             if step >= steps:
                 break
 
     dt = time.time() - t0
+    validar(steps)
     if not args.falsas:
         model.save_pretrained(args.out)
         tok.save_pretrained(args.out)

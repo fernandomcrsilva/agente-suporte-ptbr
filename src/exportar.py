@@ -7,6 +7,7 @@ import json
 import random
 from pathlib import Path
 
+from cenarios import TESTE
 from piloto import aproveitaveis as selecionar
 
 
@@ -28,6 +29,13 @@ def limpar(eventos: list[dict]) -> list[dict]:
     return saida
 
 
+def verificar_sementes(registros: list[dict]) -> None:
+    """Barra o vazamento: nenhuma conversa com semente de teste pode entrar no treino."""
+    vazadas = sorted(r["cenario"]["semente"] for r in registros if r["cenario"]["semente"] >= TESTE)
+    if vazadas:
+        raise ValueError(f"conversas com semente de teste: {vazadas[:5]}")
+
+
 def dividir(registros: list[dict], validacao: float, semente: int = 0) -> tuple[list[dict], list[dict]]:
     ids = sorted(r["cenario"]["id"] for r in registros)
     val = set(random.Random(semente).sample(ids, round(len(ids) * validacao)))
@@ -43,6 +51,7 @@ def main():
 
     registros = [json.loads(p.read_text()) for p in sorted(Path(args.pasta).glob("*-*.json"))]
     bons = selecionar(registros)
+    verificar_sementes(bons)
     treino, val = dividir(bons, args.validacao)
     saida = Path(args.saida)
     saida.mkdir(parents=True, exist_ok=True)
