@@ -1,4 +1,4 @@
-# Decisões da implementação até o piloto
+# Decisões da implementação
 
 Estas são as decisões que tomei durante a execução do plano, onde o plano ou o desenho deixavam espaço. Cada uma diz o que custa se estiver errada.
 
@@ -14,6 +14,16 @@ Estas são as decisões que tomei durante a execução do plano, onde o plano ou
 8. **O cliente simulado também pode ser descartado.** Se o Claude recusar ou cortar a resposta do cliente, a conversa é descartada. Uma fala vazia do agente vira "(O atendente não escreveu nada.)", porque a API rejeita mensagem vazia. No pior caso, uma conversa é descartada em vez de travar.
 9. **Pedidos cancelados pelo restaurante ficam abaixo do teto em 80% das sementes.** Assim, o tipo testa o reembolso total que o nome promete. O teto já é testado pelo tipo `item_acima_teto`. O custo é ter menos casos de teto entre os cancelados.
 10. **O piloto rodou com o código de antes das correções da revisão,** porque você pediu para seguir enquanto a revisão terminava. As conversas salvas foram reavaliadas com o avaliador corrigido (`python src/piloto.py --so-relatorio`), e o resultado não mudou. As duas conversas de cancelamento podem ter horários contraditórios.
+
+## Decisões do treino e da avaliação (plano 2)
+
+1. **A validação mede antes de treinar.** A perda de validação é medida no passo 0, e o log mostra a perda de treino a cada 10 passos. Isso dá a linha de base do começo. Custa uns 2 minutos a mais de treino.
+2. **O aberto e o Claude rodaram o teste durante o treino,** porque não usam a GPU. Isso economizou horas sem mudar o acerto. Mas o aberto rodou com 4 conversas em paralelo sob o limite de 18 requisições por minuto, e o tempo por fala dele (12,7 s) inclui essa espera. Mantive o run, porque o acerto e o juiz valem, e a tabela explica o número numa nota. O custo é que a latência real do DeepSeek ficou sem medida.
+3. **O juiz não vê a fala de um passo que chama ferramenta.** O cliente nunca lê esse texto. A exceção é a despedida depois de transferir, que o cliente lê. Se estiver errado, o juiz deixa de ver frases que nenhum cliente veria.
+4. **As notas do juiz são um enum de 1 a 5 no schema**, e não `minimum` e `maximum`, porque restrições numéricas podem não valer no formato estruturado. Não tem custo.
+5. **A coluna de custo mostra só o agente.** O cliente simulado custa o mesmo para todos. O custo dele está nos relatórios de cada teste.
+6. **Falha e recusa contam como não resolvidas.** Senão, um sistema que cai pareceria melhor. A tabela tem uma coluna de recusadas: das 11, 10 vieram do cliente simulado, cuja fala passou de 1.000 tokens. O Qwen sem treino teve 7 delas e pode aparecer até 2,3 pontos abaixo do que seria.
+7. **Os registros não guardam o agente nem a temperatura do cliente.** A temperatura 0 foi conferida nos comandos que rodaram os quatro testes. A tabela recusa comparar sistemas com cenários diferentes. O custo é que um teste futuro com outra temperatura passaria sem aviso.
 
 ## Pequenos ajustes que ficaram para depois
 
@@ -34,3 +44,14 @@ Achados da revisão final e da leitura do piloto. Nenhum afeta o resultado do pi
 - Em `item_fora_prazo`, um terço das entregas cai antes das 8h da manhã.
 - `_pedido` recebe um `cliente_id` que não usa.
 - Com 30 conversas, o acerto por tipo do piloto não é confiável, porque alguns ramos da política não foram sorteados.
+
+**Da avaliação (plano 2):**
+- A recusa do cliente sai igual à do agente em `src/aberto.py`, sem o prefixo "cliente:" que o `src/claude.py` usa. Por isso, o texto da tabela traz contagens deste teste escritas à mão.
+- `_liberar_gpu` roda dentro do `except`, quando o traceback ainda segura os tensores (`src/piloto.py`).
+- Um `<think>` sem fechamento ou um `<|endoftext|>` chegaria ao cliente (`src/formato_qwen.py`, `src/aluno.py`). Isso não aconteceu em nenhuma das 600 conversas do aluno e do Qwen sem treino.
+- O agente da API que bate o `max_tokens` vira recusa. O Qwen que bate os 400 tokens segue com o texto cortado.
+- O intervalo por bootstrap dá limite superior exato perto de 100%. O intervalo de Wilson seria mais honesto nesse extremo.
+- Uma conversa que vira falha ou recusa perde o estado, e um erro grave cometido antes some da contagem.
+- O Qwen sem treino recebe as descrições curtas das ferramentas. A política completa no prompt já traz as regras que as descrições longas repetem.
+- O relatório de um teste retomado só cobre as conversas novas.
+- `_falha` grava `Uso("claude-opus-5-5")` para qualquer agente. O gasto do juiz corre entre threads sem trava. As linhas `[ferramenta _invalida]` dão ao juiz uma pista de que o modelo é fraco.
