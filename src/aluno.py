@@ -26,11 +26,12 @@ class ModeloQwen:
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         self.tok = AutoTokenizer.from_pretrained(modelo)
-        m = AutoModelForCausalLM.from_pretrained(modelo, dtype=torch.bfloat16).to("cuda")
+        m = AutoModelForCausalLM.from_pretrained(modelo, dtype=torch.bfloat16)
         if adaptador:
             from peft import PeftModel
-            m = PeftModel.from_pretrained(m, adaptador).merge_and_unload()  # fundido: gera mais rápido
-        self.m = m.eval()
+            # fundido antes de ir para a GPU: gera mais rápido e funciona no ZeroGPU, que só empresta a GPU na geração
+            m = PeftModel.from_pretrained(m, adaptador).merge_and_unload()
+        self.m = m.to("cuda").eval()
         self.fim = self.tok.convert_tokens_to_ids("<|im_end|>")
         self.max_novos = max_novos
 

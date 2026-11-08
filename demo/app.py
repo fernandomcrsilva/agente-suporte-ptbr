@@ -1,40 +1,64 @@
 """Demo do agente de suporte: você faz o papel do cliente e vê as ferramentas e o estado do sistema.
 
-uso local: GGUF=runs/gguf/qwen3-1.7b-agente-suporte-ptbr-Q4_K_M.gguf python demo/app.py
-No Space, o GGUF vem do repositório do modelo no Hugging Face.
+No Space (ZeroGPU), roda o aluno em bf16 com o LoRA publicado no Hugging Face, o mesmo modelo avaliado.
+
+uso local na GPU: ADAPTADOR=runs/aluno python demo/app.py
+uso local na CPU: GGUF=runs/gguf/qwen3-1.7b-agente-suporte-ptbr-Q8_0.gguf python demo/app.py
 """
 import os
 import sys
 from pathlib import Path
 
+try:
+    import spaces  # antes do torch: no ZeroGPU, ele empresta a GPU só durante cada geração
+    na_gpu = spaces.GPU(duration=30)
+except ImportError:  # teste local sem o pacote spaces
+    def na_gpu(f):
+        return f
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))  # igual no repositório e no Space
 
 import gradio as gr  # noqa: E402
 
-from aluno import ModeloGGUF  # noqa: E402
+from aluno import ModeloGGUF, ModeloQwen  # noqa: E402
 from demo import CASOS, aviso_fim, conferencia, enviar, novo_atendimento, painel, papel  # noqa: E402
 from formato_qwen import prompt_sistema  # noqa: E402
 
-REPO = "FMendonca/qwen3-1.7b-agente-suporte-ptbr-gguf"
-ARQUIVO = "qwen3-1.7b-agente-suporte-ptbr-Q4_K_M.gguf"
+REPO_LORA = "FMendonca/qwen3-1.7b-agente-suporte-ptbr"
 GITHUB = "https://github.com/fernandomcrsilva/agente-suporte-ptbr"
 INTRO = f"""# Atendente de suporte treinado em casa
 
 Você é cliente da Garfo Ligeiro, um app de delivery fictício. Escolha um caso, leia o que aconteceu de verdade com o \
-pedido e escreva como se fosse o cliente. Quem responde é um Qwen3-1.7B com LoRA, treinado numa placa de vídeo de 8 GB \
-e compactado em GGUF. Ele roda aqui na CPU gratuita do Hugging Face, então cada resposta leva alguns segundos.
+pedido e escreva como se fosse o cliente. Quem responde é um Qwen3-1.7B com LoRA, treinado numa placa de vídeo de 8 GB. \
+É o mesmo modelo medido nos 300 cenários de teste, onde resolveu 85,7% dos casos. O caso do prazo de 48 horas é onde ele \
+mais erra (45,5%), e está aqui de propósito.
 
 Ao lado aparecem as ferramentas que o agente chamou e o que mudou no sistema. [Código, medições e limitações]({GITHUB})."""
 
 
-def carregar() -> ModeloGGUF:
-    caminho = os.environ.get("GGUF")
-    if not caminho:
-        from huggingface_hub import hf_hub_download
-        caminho = hf_hub_download(REPO, ARQUIVO)
-    m = ModeloGGUF(caminho, n_threads=int(os.environ.get("THREADS", "2")))
-    m.aquecer(m.tok(prompt_sistema(m.tok), add_special_tokens=False)["input_ids"])
-    return m
+class ModeloNaGPU:
+    """O aluno em bf16 com o LoRA, o modelo avaliado. Cada geração pede a GPU ao ZeroGPU: entram ids e sai texto."""
+
+    def __init__(self, adaptador: str):
+        self.qwen = ModeloQwen(adaptador=adaptador)
+        self.tok = self.qwen.tok
+
+    def gerar(self, ids: list[int]) -> str:
+        return _gerar_na_gpu(ids)
+
+
+@na_gpu
+def _gerar_na_gpu(ids: list[int]) -> str:
+    return MODELO.qwen.gerar(ids)
+
+
+def carregar():
+    """No Space, o aluno em bf16 no ZeroGPU. Com GGUF=arquivo, o aluno em GGUF na CPU, para testar sem GPU."""
+    if os.environ.get("GGUF"):
+        m = ModeloGGUF(os.environ["GGUF"], n_threads=int(os.environ.get("THREADS", "2")))
+        m.aquecer(m.tok(prompt_sistema(m.tok), add_special_tokens=False)["input_ids"])
+        return m
+    return ModeloNaGPU(os.environ.get("ADAPTADOR", REPO_LORA))
 
 
 MODELO = carregar()
