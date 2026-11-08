@@ -8,6 +8,10 @@ O aluno aprendeu com conversas de um professor aberto, o DeepSeek V4.1 Flash. O 
 - **Modelos:** o [adaptador LoRA](https://huggingface.co/FMendonca/qwen3-1.7b-agente-suporte-ptbr) e a [versão em GGUF](https://huggingface.co/FMendonca/qwen3-1.7b-agente-suporte-ptbr-gguf).
 - **Dados:** as [1.973 conversas do professor](https://huggingface.co/datasets/FMendonca/conversas-suporte-delivery-ptbr), 1.874 de treino e 99 de validação.
 
+![A demo rodando em casa: o cliente reclama de um atraso, o agente consulta o pedido e o rastreio e emite o cupom de R$ 20 que a política manda](docs/demo.gif)
+
+*A demo rodando numa RX 7600. O cliente reclama de um pedido que chegou 72 minutos atrasado. O agente lista os pedidos, rastreia a entrega e emite o cupom de R$ 20 que a política manda. O painel ao lado mostra as ferramentas chamadas, o que mudou no sistema e a conferência pela política.*
+
 ## Em um minuto
 
 Cada sistema atendeu os mesmos 300 cenários de teste, que nunca entraram no treino, conversando com o mesmo cliente simulado. Um caso conta como resolvido quando o estado final do sistema é igual ao que a política manda. Um erro grave é dar ao cliente algo a que ele não tinha direito.

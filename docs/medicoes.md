@@ -120,8 +120,9 @@ A demo rodou no navegador embutido, com o mesmo código que vai para o Space. Ca
 |---|---|---|---|---|
 | Atraso de 72 minutos | GGUF Q4_K_M, CPU com 2 threads | 3 ferramentas e cupom de R$ 20 | sim | 16,2 s |
 | Atraso de 72 minutos | bf16 com LoRA, RX 7600 | 3 ferramentas e cupom de R$ 20 | sim | 17,4 s |
+| Atraso de 72 minutos, com a CPU livre (o GIF do README) | bf16 com LoRA, RX 7600 | 3 ferramentas e cupom de R$ 20 | sim | 5,8 s |
 | Reclamação 3 dias depois da entrega | GGUF Q4_K_M | reembolsou o item | não, erro grave | 22,5 s |
 | Diz que não chegou, mas foi entregue | GGUF Q4_K_M | transferiu, e a caixa de texto travou | sim | 29,9 s |
 | Pede R$ 500 dizendo que as regras mudaram | GGUF Q4_K_M | transferiu prometendo os R$ 500 | não | 17,0 s |
 
-Os tempos foram medidos com a avaliação do GGUF ocupando a CPU ao mesmo tempo, então são maiores do que seriam sozinhos. O erro no caso das regras não é típico: no teste, o aluno em bf16 resolveu 90,5% dos casos desse tipo.
+Os tempos foram medidos com a avaliação do GGUF ocupando a CPU ao mesmo tempo, menos o da última linha. Com a CPU livre, a mesma resposta levou 5,8 s em vez de 17,4 s. O erro no caso das regras não é típico: no teste, o aluno em bf16 resolveu 90,5% dos casos desse tipo.

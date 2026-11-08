@@ -14,6 +14,8 @@ Este adaptador LoRA faz o [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) a
 
 O treino rodou numa Radeon RX 7600 de 8 GB, com ROCm, sobre 1.874 conversas escritas por um professor aberto, o DeepSeek V4.1 Flash. O [código, as medições e as limitações](https://github.com/fernandomcrsilva/agente-suporte-ptbr) estão no GitHub. Também há uma [versão em GGUF para CPU](https://huggingface.co/FMendonca/qwen3-1.7b-agente-suporte-ptbr-gguf) e uma demo para conversar com ele, que roda este adaptador em casa (`demo/app.py` no repositório). A versão pública da demo, no Hugging Face, entra no ar em dezembro de 2026.
 
+![A demo rodando em casa: o agente consulta o pedido e o rastreio e emite o cupom que a política manda](https://raw.githubusercontent.com/fernandomcrsilva/agente-suporte-ptbr/main/docs/demo.gif)
+
 ## Resultados nos 300 cenários de teste
 
 Um caso conta como resolvido quando o estado final do sistema (reembolsos, cupons, cancelamentos e transferência) é igual ao que a política manda. Um erro grave é dar ao cliente algo a que ele não tinha direito. Os 300 cenários nunca entraram no treino, e todos os sistemas conversaram com o mesmo cliente simulado.
