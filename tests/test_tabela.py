@@ -37,3 +37,17 @@ def test_falha_conta_como_nao_resolvida():
     texto = tabela({"aluno": [reg(1), reg(2, status="falha")]}, {"aluno": []})
     linha = next(l for l in texto.splitlines() if l.startswith("| aluno |"))
     assert "50,0%" in linha
+
+
+def test_recusa_sistemas_com_cenarios_diferentes():
+    try:
+        tabela({"aluno": [reg(1)], "base": [reg(1), reg(2)]}, {})
+    except ValueError as e:
+        assert "base" in str(e)
+    else:
+        raise AssertionError("a tabela comparou sistemas com cenários diferentes")
+
+
+def test_avisa_que_tempo_do_aberto_inclui_a_espera():
+    assert "espera" not in tabela({"aluno": [reg(1)]}, {})
+    assert "18 requisições por minuto" in tabela({"aberto": [reg(1)]}, {})

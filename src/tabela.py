@@ -52,6 +52,10 @@ def _linha(nome: str, regs: list[dict], notas: list[dict]) -> str:
 
 def tabela(sistemas: dict[str, list[dict]], juiz: dict[str, list[dict]]) -> str:
     nomes = [s for s in ORDEM if s in sistemas] + sorted(set(sistemas) - set(ORDEM))
+    ids = {s: {r["cenario"]["id"] for r in sistemas[s]} for s in nomes}
+    diferentes = [s for s in nomes if ids[s] != ids[nomes[0]]]
+    if diferentes:  # um teste pela metade ou com outras sementes não entra na comparação
+        raise ValueError(f"cenários diferentes de {nomes[0]} em: {', '.join(diferentes)}")
     linhas = [
         "| Sistema | Resolvidos (IC 95%) | Erros graves | Tentativas bloqueadas | Transferências certas | "
         "Clareza / tom (juiz, 1 a 5) | Promessas sem cumprir (juiz) | Custo do agente por conversa (US$) | "
@@ -59,6 +63,9 @@ def tabela(sistemas: dict[str, list[dict]], juiz: dict[str, list[dict]]) -> str:
         "|---|---|---|---|---|---|---|---|---|",
         *[_linha(s, sistemas[s], juiz.get(s, [])) for s in nomes],
         "",
+        *(["O tempo do aberto inclui a espera do limite de 18 requisições por minuto que o próprio teste impõe ao "
+           "Workers AI, com 4 conversas em paralelo. Ele mostra o ritmo do teste, não a velocidade do modelo.", ""]
+          if "aberto" in nomes else []),
         "### Resolvidos por tipo de cenário",
         "",
         "| Tipo | " + " | ".join(nomes) + " |",
