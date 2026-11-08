@@ -12,9 +12,10 @@ from custo import Uso
 from piloto import _br, reavaliar
 
 RAIZ = Path(__file__).resolve().parent.parent
-ORDEM = ("aluno", "base", "aberto", "claude")
+ORDEM = ("aluno", "gguf", "base", "aberto", "claude")
 NOMES = {
     "aluno": "Qwen3-1.7B com LoRA, treinado com as conversas do professor aberto, rodando na RX 7600",
+    "gguf": "Aluno compactado em GGUF (Q8_0), rodando na CPU com llama.cpp e 8 threads, para quem não tem GPU",
     "base": "Qwen3-1.7B sem treino, com o prompt completo do professor (a política escrita), na RX 7600",
     "aberto": "DeepSeek V4.1 Flash no Workers AI, o professor que gerou as conversas de treino",
     "claude": "Claude Opus 5.5, só como referência (as saídas dele não entram no treino)",
@@ -95,19 +96,20 @@ def main():
         "",
         f"Cada sistema atendeu os mesmos {max(n.values())} cenários de teste (sementes 1.000.000 em diante), que "
         "nunca entraram no treino. Todos conversaram com o mesmo cliente simulado, o Mistral Small 3.1 com "
-        "temperatura 0.",
+        "temperatura 0. Mesmo assim, o Workers AI nem sempre repete a mesma fala: a primeira fala do cliente muda "
+        "em cerca de 1 a cada 10 cenários entre um teste e outro.",
         "",
         "- **Resolvidos:** o estado final (reembolsos, cupons, cancelamentos e transferência) é igual ao que a "
         "política manda. Conversas que falharam contam como não resolvidas. O intervalo de 95% vem de bootstrap.",
         "- **Recusadas:** a conversa parou porque a resposta de um modelo foi cortada no limite de tokens. Elas "
-        "contam como não resolvidas. Neste teste, 10 das 11 vieram do cliente simulado, cuja fala passou de 1.000 "
+        "contam como não resolvidas. Neste teste, 12 das 13 vieram do cliente simulado, cuja fala passou de 1.000 "
         "tokens, e só uma veio de um agente: o Claude, que passou de 8.000.",
         "- **Erros graves:** o agente deu algo que o cliente não tinha direito de receber.",
         "- **Tentativas bloqueadas:** o agente tentou passar de um limite e o sistema barrou.",
         "- **Juiz:** o Claude Sonnet 5.5 leu cada conversa às cegas, sem saber qual sistema atendeu, e deu nota só ao "
         "texto que o cliente leu.",
-        "- **Custo:** só o do agente. O cliente simulado custa o mesmo para todos e fica de fora. Os sistemas na GPU "
-        "local aparecem com custo zero.",
+        "- **Custo:** só o do agente. O cliente simulado custa o mesmo para todos e fica de fora. Os sistemas que "
+        "rodam em casa, na GPU ou na CPU, aparecem com custo zero.",
         "",
         "Os sistemas:",
         "",

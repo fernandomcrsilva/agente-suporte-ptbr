@@ -60,6 +60,7 @@ O aluno é o Qwen3-1.7B com LoRA de posto 16 nas sete projeções. Ele treinou c
 | Medida | Valor |
 |---|---|
 | Conversas aproveitáveis | 1.973 de 2.000 (98,7%) |
+| Custo da geração no Workers AI | US$ 2,48 pelas 2.000 conversas (`runs/geracao/relatorio.txt`) |
 | Treino e validação | 1.874 e 99 conversas |
 | Tamanho das conversas | 1.412 tokens em média, 2.945 na maior |
 | Passos de otimização | 235 (2 épocas, batch 2 com acumulação de 8, taxa 2e-4) |
@@ -91,3 +92,36 @@ A tabela completa está em [`resultados.md`](resultados.md). O que ela mostra:
 - **Custo e tempo.** O aluno roda na RX 7600 com 2,5 s por fala e custo zero de API. O Claude Opus custou US$ 0,027 por conversa. O tempo do aberto (12,7 s) inclui a espera do limite que o próprio teste impõe, e não é a velocidade do modelo.
 
 Gasto da avaliação na Anthropic: US$ 8,14 no Claude Opus e US$ 4,74 no juiz, somando US$ 12,88 dos US$ 25 previstos. No Workers AI, foram US$ 0,95: o professor aberto e o cliente simulado dos quatro testes.
+
+## GGUF do aluno (08/11/2026)
+
+O LoRA foi fundido no Qwen3-1.7B em bf16, convertido com o llama.cpp no commit `0c1e570` e quantizado. O GGUF roda no llama-cpp-python 0.3.36, que usa esse mesmo commit, com o mesmo formato do treino: os tokens vêm do tokenizer do Hugging Face, e não do template de chat embutido no arquivo. Os dois testes usaram os mesmos 300 cenários e o mesmo cliente, numa CPU Ryzen 7 5700X com 8 threads.
+
+| Medida | Q4_K_M | Q8_0 |
+|---|---|---|
+| Tamanho | 1,11 GB | 1,83 GB |
+| Cenários rodados | 79, parado no meio | 300 |
+| Resolvidos | 60 de 79 (75,9%); o bf16 resolveu 70 desses 79 | 256 de 300, 85,3% (IC 81,3–89,3); o bf16 resolveu 85,7% |
+| Contra o bf16, só nos cenários com a mesma primeira fala do cliente | 55 contra 65, em 72: perdeu 12 casos e ganhou 2 | 226 contra 226, em 267: perdeu 7 casos e ganhou 7 |
+| Erros graves | não contados | 15 (o bf16 teve 19) |
+| Tempo por fala do agente | não medido | mediana de 3,2 s |
+| Gasto no Workers AI (só o cliente simulado) | US$ 0,04 | US$ 0,13 |
+
+- **O Q4_K_M piorou o aluno, e o Q8_0 não.** Com o Q8_0, o aluno empatou com o bf16 nos cenários comparáveis. Ficou o Q8_0.
+- **O cliente simulado não repete sempre a mesma fala.** Mesmo com temperatura 0, o Workers AI devolveu primeiras falas diferentes entre um teste e outro: foram iguais em 258 de 293 cenários entre aluno e base, em 265 de 298 entre aluno e aberto e em 266 de 297 entre aberto e Claude. Por isso, a comparação pareada usa só os cenários em que a abertura foi igual.
+- **Na CPU, o prompt fixo pesa na primeira fala.** Com 2 threads e o Q4_K_M, a primeira fala levou 14,9 s, quase todos lendo o prompt de sistema. A segunda levou 2,7 s, porque o llama.cpp reaproveita o que já leu. A demo na CPU lê esse prompt antes de abrir.
+- **As duas recusas do Q8_0 vieram do cliente simulado,** cuja fala passou de 1.000 tokens.
+
+## Demo local (08/11/2026)
+
+A demo rodou no navegador embutido, com o mesmo código que vai para o Space. Cada caso foi atendido uma vez.
+
+| Caso | Modelo | O que o agente fez | Certo pela política | Tempo da resposta |
+|---|---|---|---|---|
+| Atraso de 72 minutos | GGUF Q4_K_M, CPU com 2 threads | 3 ferramentas e cupom de R$ 20 | sim | 16,2 s |
+| Atraso de 72 minutos | bf16 com LoRA, RX 7600 | 3 ferramentas e cupom de R$ 20 | sim | 17,4 s |
+| Reclamação 3 dias depois da entrega | GGUF Q4_K_M | reembolsou o item | não, erro grave | 22,5 s |
+| Diz que não chegou, mas foi entregue | GGUF Q4_K_M | transferiu, e a caixa de texto travou | sim | 29,9 s |
+| Pede R$ 500 dizendo que as regras mudaram | GGUF Q4_K_M | transferiu prometendo os R$ 500 | não | 17,0 s |
+
+Os tempos foram medidos com a avaliação do GGUF ocupando a CPU ao mesmo tempo, então são maiores do que seriam sozinhos. O erro no caso das regras não é típico: no teste, o aluno em bf16 resolveu 90,5% dos casos desse tipo.
