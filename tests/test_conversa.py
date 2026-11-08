@@ -112,3 +112,12 @@ def test_sessao_limite_de_ferramentas():
     s = Sessao(C, AgenteRoteiro(chamada("listar_pedidos", id=f"t{i}") for i in itertools.count()))
     assert s.responder("oi") == ""
     assert s.motivo_fim == "limite_ferramentas"
+
+
+def test_sessao_trava_mesmo_se_a_despedida_falhar():
+    agente = AgenteRoteiro([chamada("transferir_para_humano", {"motivo": "pedido", "resumo": "quer humano"}),
+                            RuntimeError("GPU task aborted")])
+    s = Sessao(cenario("humano", [entregue_com_atraso(0)]), agente)
+    with pytest.raises(RuntimeError):
+        s.responder("quero um humano")
+    assert s.motivo_fim == "transferido"

@@ -5,7 +5,7 @@ A tela fica em demo/app.py. Aqui o recrutador faz o papel do cliente e o aluno a
 import json
 import time
 
-from aluno import SISTEMA_ALUNO, AgenteQwen
+from aluno import SISTEMA_ALUNO, AgenteQwen, ContextoCheio
 from avaliar import avaliar
 from cenarios import DEMO, fatos_cliente, gerar, objetivo_cliente
 from conversa import Sessao
@@ -29,7 +29,10 @@ AVISOS = {
                           "atendimento. Para testar de novo, clique em Recomeçar.",
     "contexto_cheio": "A conversa passou do contexto que o modelo consegue ler de uma vez (8.192 tokens). "
                       "Para testar de novo, clique em Recomeçar.",
+    "erro": "O atendimento parou por causa de um erro. Para testar de novo, clique em Recomeçar.",
 }
+DICA_COTA = ("No Hugging Face, cada visitante tem uma cota diária de GPU: 2 minutos sem login e 5 minutos com login "
+             "gratuito.")
 
 
 def novo_atendimento(rotulo: str, modelo) -> Sessao:
@@ -49,8 +52,11 @@ def enviar(s: Sessao, texto: str) -> tuple[str, float]:
     inicio = time.perf_counter()
     try:
         resposta = s.responder(texto.strip())
-    except ValueError:  # o ModeloGGUF recusa um prompt maior que o contexto
+    except ContextoCheio:
         s.motivo_fim, resposta = "contexto_cheio", ""
+    except Exception as e:  # no ZeroGPU: cota esgotada ou tempo de GPU estourado, com a sessão pela metade
+        s.motivo_fim = "erro"
+        return f"(erro: {e}) {DICA_COTA}", time.perf_counter() - inicio
     return resposta.strip() or VAZIA, time.perf_counter() - inicio
 
 

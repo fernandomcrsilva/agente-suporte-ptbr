@@ -57,10 +57,10 @@ class Sessao:
                         "resultado": self.sistema.executar(ch["nome"], ch["args"])} for ch in turno["chamadas"]]
             self.eventos += entrada
             if self.sistema.transferido:
+                self.motivo_fim = "transferido"  # antes da despedida: se ela falhar, a sessão já está travada
                 # ponytail: um passo final para se despedir; chamadas nesse passo não são executadas
                 final = self.agente.passo(entrada)
                 self.eventos.append({"papel": "agente", "texto": final["texto"], "chamadas": final["chamadas"]})
-                self.motivo_fim = "transferido"
                 return final["texto"]
         self.motivo_fim = "limite_ferramentas"
         return ""

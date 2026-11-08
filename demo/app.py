@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))  # igual
 import gradio as gr  # noqa: E402
 
 from aluno import ModeloGGUF, ModeloQwen  # noqa: E402
-from demo import CASOS, aviso_fim, conferencia, enviar, novo_atendimento, painel, papel  # noqa: E402
+from demo import CASOS, DICA_COTA, aviso_fim, conferencia, enviar, novo_atendimento, painel, papel  # noqa: E402
 from formato_qwen import prompt_sistema  # noqa: E402
 
 REPO_LORA = "FMendonca/qwen3-1.7b-agente-suporte-ptbr"
@@ -31,9 +31,10 @@ INTRO = f"""# Atendente de suporte treinado em casa
 Você é cliente da Garfo Ligeiro, um app de delivery fictício. Escolha um caso, leia o que aconteceu de verdade com o \
 pedido e escreva como se fosse o cliente. Quem responde é um Qwen3-1.7B com LoRA, treinado numa placa de vídeo de 8 GB. \
 É o mesmo modelo medido nos 300 cenários de teste, onde resolveu 85,7% dos casos. O caso do prazo de 48 horas é onde ele \
-mais erra (45,5%), e está aqui de propósito.
+mais erra: lá, resolveu só 45,5%. Ele está aqui de propósito.
 
-Ao lado aparecem as ferramentas que o agente chamou e o que mudou no sistema. [Código, medições e limitações]({GITHUB})."""
+Ao lado aparecem as ferramentas que o agente chamou e o que mudou no sistema. {DICA_COTA} \
+[Código, medições e limitações]({GITHUB})."""
 
 
 class ModeloNaGPU:
@@ -64,13 +65,16 @@ def carregar():
 MODELO = carregar()
 
 
+DICA_CAIXA = "Escreva como cliente e aperte Enter"
+
+
 def _segundos(x: float) -> str:
     return f"{x:.1f}".replace(".", ",") + " s"
 
 
 def iniciar(rotulo):
     s = novo_atendimento(rotulo, MODELO)
-    return s, papel(s), [], painel(s), conferencia(s), gr.update(value="", interactive=True)
+    return s, papel(s), [], painel(s), conferencia(s), gr.update(value="", interactive=True, placeholder=DICA_CAIXA)
 
 
 def falar(texto, s, historico):
@@ -94,17 +98,18 @@ with gr.Blocks(title="Atendente de suporte treinado em casa") as app:
             caso = gr.Dropdown(list(CASOS), value=next(iter(CASOS)), label="Caso")
             papel_md = gr.Markdown()
             chat = gr.Chatbot(label="Atendimento", height=460)
-            caixa = gr.Textbox(label="Sua mensagem", placeholder="Escreva como cliente e aperte Enter")
+            caixa = gr.Textbox(label="Sua mensagem", placeholder=DICA_CAIXA)
             recomecar = gr.Button("Recomeçar")
         with gr.Column(scale=2):
             painel_md = gr.Markdown()
             with gr.Accordion("O que a política manda (spoiler)", open=False):
                 conferencia_md = gr.Markdown()
     saidas = [sessao, papel_md, chat, painel_md, conferencia_md, caixa]
+    resposta = caixa.submit(falar, [caixa, sessao, chat], [sessao, chat, caixa, painel_md, conferencia_md])
     app.load(iniciar, caso, saidas)
-    caso.change(iniciar, caso, saidas)
-    recomecar.click(iniciar, caso, saidas)
-    caixa.submit(falar, [caixa, sessao, chat], [sessao, chat, caixa, painel_md, conferencia_md])
+    # trocar de caso ou recomeçar cancela uma resposta pendente, que senão devolveria a sessão antiga
+    caso.change(iniciar, caso, saidas, cancels=[resposta])
+    recomecar.click(iniciar, caso, saidas, cancels=[resposta])
 
 if __name__ == "__main__":
     app.queue(default_concurrency_limit=1).launch()

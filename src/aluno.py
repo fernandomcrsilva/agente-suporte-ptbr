@@ -44,6 +44,10 @@ class ModeloQwen:
         return self.tok.decode(out[0, len(ids):], skip_special_tokens=False)
 
 
+class ContextoCheio(ValueError):
+    """A conversa passou do contexto que o llama.cpp consegue ler."""
+
+
 class ModeloGGUF:
     """O aluno em GGUF na CPU (llama.cpp), com a mesma interface do ModeloQwen.
 
@@ -68,7 +72,7 @@ class ModeloGGUF:
 
     def gerar(self, ids: list[int]) -> str:
         if len(ids) >= self.n_ctx:
-            raise ValueError(f"conversa maior que o contexto: {len(ids)} tokens de {self.n_ctx}")
+            raise ContextoCheio(f"conversa maior que o contexto: {len(ids)} tokens de {self.n_ctx}")
         novos = []
         # gulosa (temp 0); o llama.cpp reaproveita o cache do prefixo que se repete entre as falas
         for t in self.llm.generate(ids, temp=0.0, repeat_penalty=1.0):

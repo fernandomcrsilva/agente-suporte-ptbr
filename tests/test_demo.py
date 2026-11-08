@@ -28,17 +28,27 @@ def test_resposta_vazia_vira_aviso(tok):
     assert enviar(s, "oi")[0] == "(o atendente não escreveu nada)"
 
 
+class Quebrado:
+    def __init__(self, tok, erro):
+        self.tok, self.erro = tok, erro
+
+    def gerar(self, ids):
+        raise self.erro
+
+
 def test_contexto_cheio_encerra(tok):
-    class Cheio:
-        def __init__(self):
-            self.tok = tok
+    from aluno import ContextoCheio
 
-        def gerar(self, ids):
-            raise ValueError("conversa maior que o contexto")
-
-    s = novo_atendimento("Pedido chegou atrasado", Cheio())
+    s = novo_atendimento("Pedido chegou atrasado", Quebrado(tok, ContextoCheio("conversa maior que o contexto")))
     enviar(s, "oi")
     assert s.motivo_fim == "contexto_cheio" and "contexto" in aviso_fim(s.motivo_fim)
+
+
+def test_erro_da_gpu_encerra_com_a_mensagem(tok):
+    s = novo_atendimento("Pedido chegou atrasado", Quebrado(tok, RuntimeError("You have exceeded your free ZeroGPU quota")))
+    resposta, _ = enviar(s, "oi")
+    assert s.motivo_fim == "erro"
+    assert "ZeroGPU quota" in resposta and "login" in resposta
 
 
 def _reembolso_certo(tok):
