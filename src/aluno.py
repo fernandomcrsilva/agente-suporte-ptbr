@@ -43,6 +43,38 @@ class ModeloQwen:
         return self.tok.decode(out[0, len(ids):], skip_special_tokens=False)
 
 
+class ModeloGGUF:
+    """O aluno em GGUF na CPU (llama.cpp), com a mesma interface do ModeloQwen.
+
+    Os ids vêm do prompt_geracao, com o tokenizer do Hugging Face, e a saída é decodificada por ele: o template de chat
+    embutido no GGUF nunca é usado, porque o aluno foi treinado no formato do formato_qwen.py.
+    """
+
+    def __init__(self, caminho: str, tokenizer: str = "Qwen/Qwen3-1.7B", n_threads: int = 2, n_ctx: int = 8192,
+                 max_novos: int = 400):
+        from llama_cpp import Llama
+        from transformers import AutoTokenizer
+
+        self.tok = AutoTokenizer.from_pretrained(tokenizer)
+        self.llm = Llama(model_path=caminho, n_ctx=n_ctx, n_threads=n_threads, n_threads_batch=n_threads,
+                         verbose=False)
+        self.fins = {self.tok.convert_tokens_to_ids(t) for t in ("<|im_end|>", "<|endoftext|>")}
+        self.n_ctx, self.max_novos = n_ctx, max_novos
+
+    def gerar(self, ids: list[int]) -> str:
+        if len(ids) >= self.n_ctx:
+            raise ValueError(f"conversa maior que o contexto: {len(ids)} tokens de {self.n_ctx}")
+        novos = []
+        # gulosa (temp 0); o llama.cpp reaproveita o cache do prefixo que se repete entre as falas
+        for t in self.llm.generate(ids, temp=0.0, repeat_penalty=1.0):
+            if t in self.fins:
+                break
+            novos.append(t)
+            if len(novos) >= min(self.max_novos, self.n_ctx - len(ids)):
+                break
+        return self.tok.decode(novos, skip_special_tokens=False)
+
+
 class AgenteQwen:
     def __init__(self, modelo, sistema: str):
         self.modelo, self.sistema = modelo, sistema

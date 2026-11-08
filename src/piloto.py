@@ -3,6 +3,7 @@
 uso: python src/piloto.py --n 30 --inicio 2000000 --teto-dolares 10 --paralelo 4
      python src/piloto.py --agente aluno --adaptador runs/aluno --inicio 1000000 --n 300 --temperatura-cliente 0 \
          --saida runs/teste/aluno
+     python src/piloto.py --agente gguf --gguf runs/gguf/qwen3-1.7b-agente-suporte-ptbr-Q4_K_M.gguf --threads 8 ...
 """
 import argparse
 import json
@@ -169,10 +170,14 @@ def main():
     ap.add_argument("--inicio", type=int, default=PILOTO)
     ap.add_argument("--teto-dolares", type=float, default=10)
     ap.add_argument("--paralelo", type=int, default=4)
-    ap.add_argument("--agente", choices=("aberto", "claude", "aluno", "base"), default="aberto",
+    ap.add_argument("--agente", choices=("aberto", "claude", "aluno", "base", "gguf"),
+                    default="aberto",
                     help="aberto: DeepSeek no Workers AI, o único que gera dados de treino; claude: Opus, só para medir; "
-                         "aluno: Qwen3 com o LoRA de --adaptador; base: Qwen3 sem treino, com o prompt do professor")
+                         "aluno: Qwen3 com o LoRA de --adaptador; base: Qwen3 sem treino, com o prompt do professor; "
+                         "gguf: o aluno em GGUF de --gguf, na CPU")
     ap.add_argument("--adaptador", help="pasta do LoRA, obrigatória com --agente aluno")
+    ap.add_argument("--gguf", help="arquivo GGUF do aluno, obrigatório com --agente gguf")
+    ap.add_argument("--threads", type=int, default=8, help="threads da CPU para o --agente gguf")
     ap.add_argument("--temperatura-cliente", type=float, help="temperatura do cliente simulado (0 no teste)")
     ap.add_argument("--saida", default=str(RAIZ / "runs" / "piloto"))
     ap.add_argument("--so-relatorio", action="store_true",
@@ -180,6 +185,8 @@ def main():
     args = ap.parse_args()
     if args.agente == "aluno" and not args.adaptador:
         ap.error("--agente aluno precisa de --adaptador")
+    if args.agente == "gguf" and not args.gguf:
+        ap.error("--agente gguf precisa de --gguf")
     saida = Path(args.saida)
 
     if args.so_relatorio:
@@ -211,6 +218,11 @@ def main():
         sistema = SISTEMA_ALUNO if args.agente == "aluno" else sistema_completo()
         fabrica = lambda c: (AgenteQwen(qwen, sistema), cliente(c))  # noqa: E731
         args.paralelo = 1  # uma GPU, um modelo
+    elif args.agente == "gguf":
+        from aluno import SISTEMA_ALUNO, AgenteQwen, ModeloGGUF
+        gguf = ModeloGGUF(args.gguf, n_threads=args.threads)
+        fabrica = lambda c: (AgenteQwen(gguf, SISTEMA_ALUNO), cliente(c))  # noqa: E731
+        args.paralelo = 1  # um modelo na CPU, com o cache de prefixo da conversa
     else:
         fabrica = lambda c: (ProfessorAberto(api), cliente(c))  # noqa: E731
     saida.mkdir(parents=True, exist_ok=True)

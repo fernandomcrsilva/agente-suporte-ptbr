@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from aluno import SISTEMA_ALUNO, AgenteQwen, sistema_completo
@@ -49,3 +51,22 @@ def test_sistema_escolhido_vai_no_prompt(tok):
     m = ModeloFalso(tok, SAIDAS)
     rodar(C, AgenteQwen(m, SISTEMA_ALUNO), ClienteRoteiro(["cadê?"]))
     assert "R$ 80" not in tok.decode(m.prompts[0])
+
+
+GGUF = Path(__file__).resolve().parent.parent / "runs" / "gguf" / "qwen3-1.7b-agente-suporte-ptbr-Q4_K_M.gguf"
+
+
+def test_gguf_chama_ferramenta():
+    pytest.importorskip("llama_cpp")
+    if not GGUF.exists():
+        pytest.skip("GGUF ainda não gerado (python src/gguf.py)")
+    from aluno import ModeloGGUF
+    from cenarios import gerar
+    from conversa import contexto
+    from sistema import NOMES
+
+    c = gerar(0, "atraso")
+    entrada = [{"papel": "contexto", "texto": contexto(c)},
+               {"papel": "cliente", "texto": "Meu pedido chegou atrasado e eu quero reclamar."}]
+    turno = AgenteQwen(ModeloGGUF(str(GGUF), n_threads=8), SISTEMA_ALUNO).passo(entrada)
+    assert turno["chamadas"] and all(ch["nome"] in NOMES for ch in turno["chamadas"])
