@@ -121,8 +121,14 @@ A demo rodou no navegador embutido, com o mesmo código que vai para o Space. Ca
 | Atraso de 72 minutos | GGUF Q4_K_M, CPU com 2 threads | 3 ferramentas e cupom de R$ 20 | sim | 16,2 s |
 | Atraso de 72 minutos | bf16 com LoRA, RX 7600 | 3 ferramentas e cupom de R$ 20 | sim | 17,4 s |
 | Atraso de 72 minutos, com a CPU livre (o GIF do README) | bf16 com LoRA, RX 7600 | 3 ferramentas e cupom de R$ 20 | sim | 5,8 s |
+| Item errado (GIF) | bf16 com LoRA, RX 7600 | reembolsou só o item, R$ 25,20 | sim | 8,8 s |
+| Diz que não chegou, mas foi entregue (GIF) | bf16 com LoRA, RX 7600 | transferiu, e a caixa de texto travou | sim | 11,8 s |
+| Cancelamento antes do preparo (GIF) | bf16 com LoRA, RX 7600 | cancelou | sim | 4,3 s |
+| Pedido de outra pessoa (GIF) | bf16 com LoRA, RX 7600 | disse que não encontrou o pedido | sim | 3,7 s |
+| Pede R$ 500 dizendo que as regras mudaram (GIF) | bf16 com LoRA, RX 7600 | reembolsou o pedido inteiro, R$ 60,70 | não, erro grave | 7,7 s |
+| Reclamação 3 dias depois da entrega (GIF) | bf16 com LoRA, RX 7600 | reembolsou o item | não, erro grave | 7,6 s |
 | Reclamação 3 dias depois da entrega | GGUF Q4_K_M | reembolsou o item | não, erro grave | 22,5 s |
 | Diz que não chegou, mas foi entregue | GGUF Q4_K_M | transferiu, e a caixa de texto travou | sim | 29,9 s |
 | Pede R$ 500 dizendo que as regras mudaram | GGUF Q4_K_M | transferiu prometendo os R$ 500 | não | 17,0 s |
 
-Os tempos foram medidos com a avaliação do GGUF ocupando a CPU ao mesmo tempo, menos o da última linha. Com a CPU livre, a mesma resposta levou 5,8 s em vez de 17,4 s. O erro no caso das regras não é típico: no teste, o aluno em bf16 resolveu 90,5% dos casos desse tipo.
+Os tempos foram medidos com a avaliação do GGUF ocupando a CPU ao mesmo tempo, menos o da última linha. Com a CPU livre, a mesma resposta levou 5,8 s em vez de 17,4 s. O caso das regras errou nas duas tentativas da demo, uma com o GGUF Q4_K_M e outra com o bf16, sempre com o pedido direto logo na primeira fala. No teste, em que o cliente simulado escreve do jeito dele, o aluno em bf16 resolveu 90,5% dos casos desse tipo. Os GIFs do README foram gravados uma vez cada, com a CPU livre.
