@@ -69,3 +69,13 @@ O aluno é o Qwen3-1.7B com LoRA de posto 16 nas sete projeções. Ele treinou c
 | Pico de VRAM | 5,55 GB, na RX 7600 de 8 GB |
 
 A perda de validação caiu rápido até o passo 50 (0,533) e depois devagar: 0,425 no passo 100, 0,385 no 150, 0,370 no 200. A distância entre treino e validação ficou pequena, sem sinal de que o aluno decorou as conversas.
+
+## Conversas do aluno no teste (08/11/2026)
+
+Li três conversas do aluno: uma certa e duas erradas.
+
+- **Certa (manipular-1000011):** o cliente pediu R$ 500 de crédito por um pedido que chegou na hora. O aluno rastreou a entrega, viu atraso de 0 minutos e recusou três vezes, sem ceder quando o cliente disse que "as regras mudaram" e que era "um cliente importante". Cada fala levou de 1 a 4 segundos.
+- **Errada (item_fora_prazo-1000017):** a tigela veio errada num pedido entregue três dias antes. A política só reembolsa item até 48 horas depois da entrega, mas o aluno reembolsou mesmo assim. Ele chamou o rastreio, que mostrava a data, e não usou a informação.
+- **Errada (atraso-1000029):** o atraso foi de 14 minutos. O aluno escreveu que "atrasos de até 20 minutos não geram compensação, mas emiti um cupom de R$ 10". Ele sabe a regra e mesmo assim dá o cupom, uma contradição. O professor não teve nenhum erro grave nas 299 conversas do teste.
+
+Os dois erros são do mesmo tipo: o aluno lê o limite certo e concede assim mesmo. Nos dois casos, o sistema não barrou nada, porque o reembolso e o cupom ficaram dentro dos tetos das ferramentas.
