@@ -61,6 +61,10 @@ class ModeloGGUF:
         self.fins = {self.tok.convert_tokens_to_ids(t) for t in ("<|im_end|>", "<|endoftext|>")}
         self.n_ctx, self.max_novos = n_ctx, max_novos
 
+    def aquecer(self, ids: list[int]) -> None:
+        """Lê um prefixo fixo (o prompt de sistema) para a primeira fala não pagar por ele."""
+        self.llm.eval(ids)
+
     def gerar(self, ids: list[int]) -> str:
         if len(ids) >= self.n_ctx:
             raise ValueError(f"conversa maior que o contexto: {len(ids)} tokens de {self.n_ctx}")

@@ -8,7 +8,7 @@ from modelos import Cenario, Item, Pedido
 from politica import TETO_REEMBOLSO, TIPOS
 
 EMPRESA = "Garfo Ligeiro"
-TREINO, TESTE, PILOTO = 0, 1_000_000, 2_000_000
+TREINO, TESTE, PILOTO, DEMO = 0, 1_000_000, 2_000_000, 3_000_000
 
 NOMES = ["Ana", "Bruno", "Carla", "Diego", "Elisa", "Fábio", "Gabriela", "Heitor", "Iara", "João", "Larissa",
          "Marcos", "Natália", "Otávio", "Paula", "Rafael", "Sabrina", "Tiago", "Vanessa", "Wagner"]

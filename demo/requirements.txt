@@ -1,0 +1,3 @@
+# O Gradio vem do sdk_version do README do Space (6.31.0). Sem torch: o tokenizer do transformers basta.
+llama-cpp-python==0.3.36
+transformers==5.22.2
