@@ -9,7 +9,7 @@ tags: [gguf, llama.cpp, agent, tool-calling, customer-support, portuguese]
 
 # Qwen3-1.7B atendente de suporte, em GGUF para CPU
 
-Esta é a versão em GGUF (Q8_0, 1,83 GB) do [Qwen3-1.7B com LoRA](https://huggingface.co/FMendonca/qwen3-1.7b-agente-suporte-ptbr) que atende o chat de suporte da Garfo Ligeiro, um app de delivery fictício. O LoRA foi fundido no modelo base e convertido com o llama.cpp, para rodar na CPU, sem GPU. A [demo](https://huggingface.co/spaces/FMendonca/agente-suporte-ptbr) roda o adaptador em bf16, na GPU.
+Esta é a versão em GGUF (Q8_0, 1,83 GB) do [Qwen3-1.7B com LoRA](https://huggingface.co/FMendonca/qwen3-1.7b-agente-suporte-ptbr) que atende o chat de suporte da Garfo Ligeiro, um app de delivery fictício. O LoRA foi fundido no modelo base e convertido com o llama.cpp, para rodar na CPU, sem GPU. A demo do repositório (`demo/app.py`) roda o adaptador em bf16, na GPU, ou este GGUF, na CPU, com `GGUF=arquivo python demo/app.py`.
 
 O código, as medições e as limitações estão no [GitHub](https://github.com/fernandomcrsilva/agente-suporte-ptbr).
 

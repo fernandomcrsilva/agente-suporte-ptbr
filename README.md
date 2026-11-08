@@ -4,7 +4,7 @@ Um modelo pequeno pode virar o atendente de suporte de uma empresa? Este projeto
 
 O aluno aprendeu com conversas de um professor aberto, o DeepSeek V4.1 Flash. O treino coube numa Radeon RX 7600 de 8 GB, e o modelo pronto também roda na CPU, compactado em GGUF. É a continuação do [review-aspects-ptbr](https://github.com/fernandomcrsilva/review-aspects-ptbr): lá, o mesmo tipo de aluno aprendeu a classificar avaliações. Aqui, ele aprende a atender.
 
-- **Demo:** [converse com o agente no Hugging Face](https://huggingface.co/spaces/FMendonca/agente-suporte-ptbr). Você faz o papel do cliente e vê, ao lado, as ferramentas chamadas e o que mudou no sistema. A demo roda o mesmo modelo da primeira linha da tabela abaixo.
+- **Demo:** roda em casa com um comando (veja [A demo e o GGUF](#a-demo-e-o-gguf)). Você faz o papel do cliente e vê, ao lado, as ferramentas chamadas e o que mudou no sistema. A demo roda o mesmo modelo da primeira linha da tabela abaixo. A versão pública, no Hugging Face, entra no ar em dezembro de 2026.
 - **Modelos:** o [adaptador LoRA](https://huggingface.co/FMendonca/qwen3-1.7b-agente-suporte-ptbr) e a [versão em GGUF](https://huggingface.co/FMendonca/qwen3-1.7b-agente-suporte-ptbr-gguf).
 - **Dados:** as [1.973 conversas do professor](https://huggingface.co/datasets/FMendonca/conversas-suporte-delivery-ptbr), 1.874 de treino e 99 de validação.
 
@@ -87,7 +87,14 @@ A mudança que mais pesou foi ligar a atenção eficiente do ROCm, que na RX 760
 
 ## A demo e o GGUF
 
-A demo roda no ZeroGPU, a GPU compartilhada do Hugging Face, com o aluno em bf16 e o LoRA: o mesmo modelo que resolveu 85,7% dos casos no teste. Cada fala do agente pede a GPU só durante a geração. A lógica da demo fica em [`src/demo.py`](src/demo.py), e a tela em [`demo/app.py`](demo/app.py). Sem GPU, a mesma demo roda na CPU com o GGUF.
+A demo roda o aluno em bf16 com o LoRA: o mesmo modelo que resolveu 85,7% dos casos no teste. Com o repositório clonado e as dependências de [Como reproduzir](#como-reproduzir), ela abre em `http://127.0.0.1:7860`:
+
+```bash
+python demo/app.py                                                       # na GPU, com o LoRA do Hugging Face
+GGUF=qwen3-1.7b-agente-suporte-ptbr-Q8_0.gguf python demo/app.py         # na CPU, com o GGUF
+```
+
+A lógica da demo fica em [`src/demo.py`](src/demo.py), e a tela em [`demo/app.py`](demo/app.py). O mesmo código já está pronto para o ZeroGPU, a GPU compartilhada do Hugging Face, onde cada fala do agente pede a GPU só durante a geração. A versão pública entra no ar quando a conta do Hugging Face completar os 30 dias que o ZeroGPU gratuito exige, em dezembro de 2026.
 
 O GGUF recebe a conversa exatamente no formato do treino: os tokens vêm do tokenizer do Qwen3 e vão direto para o llama.cpp, sem passar pelo template de chat embutido no arquivo. Em Q8_0 (1,83 GB), ele resolveu 85,3% dos casos, empatado com o modelo original. O Q4_K_M (1,11 GB) piorou: nos cenários comparáveis, perdeu 12 casos que o original resolvia e ganhou só 2. As medidas estão em [`docs/medicoes.md`](docs/medicoes.md).
 

@@ -12,7 +12,7 @@ tags: [lora, agent, tool-calling, customer-support, portuguese, distillation, ro
 
 Este adaptador LoRA faz o [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) atender o chat de suporte da Garfo Ligeiro, um app de delivery fictício. O modelo conversa com o cliente e chama as ferramentas de um sistema de pedidos simulado: ele lista e detalha pedidos, rastreia entregas, reembolsa itens, emite cupons, cancela pedidos e transfere o caso para uma pessoa. A política da empresa não vai no prompt. Ele aprendeu as regras pelos exemplos.
 
-O treino rodou numa Radeon RX 7600 de 8 GB, com ROCm, sobre 1.874 conversas escritas por um professor aberto, o DeepSeek V4.1 Flash. O [código, as medições e as limitações](https://github.com/fernandomcrsilva/agente-suporte-ptbr) estão no GitHub. Também há uma [versão em GGUF para CPU](https://huggingface.co/FMendonca/qwen3-1.7b-agente-suporte-ptbr-gguf) e uma [demo para conversar com ele](https://huggingface.co/spaces/FMendonca/agente-suporte-ptbr), que roda este adaptador no ZeroGPU.
+O treino rodou numa Radeon RX 7600 de 8 GB, com ROCm, sobre 1.874 conversas escritas por um professor aberto, o DeepSeek V4.1 Flash. O [código, as medições e as limitações](https://github.com/fernandomcrsilva/agente-suporte-ptbr) estão no GitHub. Também há uma [versão em GGUF para CPU](https://huggingface.co/FMendonca/qwen3-1.7b-agente-suporte-ptbr-gguf) e uma demo para conversar com ele, que roda este adaptador em casa (`demo/app.py` no repositório). A versão pública da demo, no Hugging Face, entra no ar em dezembro de 2026.
 
 ## Resultados nos 300 cenários de teste
 
