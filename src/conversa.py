@@ -31,39 +31,57 @@ def contexto(c: Cenario) -> str:
     return f"Cliente logado: {c.nome} ({c.cliente_id}). Agora: {c.agora.strftime('%d/%m %H:%M')}."
 
 
+class Sessao:
+    """Uma conversa avançada uma fala do cliente por vez: o loop, a demo (quem escreve é uma pessoa) e o teste."""
+
+    def __init__(self, c: Cenario, agente: Agente, max_rodadas_ferramenta: int = 6):
+        self.c, self.agente, self.max_rodadas = c, agente, max_rodadas_ferramenta
+        self.sistema = Sistema(c)
+        self.eventos: list[dict] = []
+        self.motivo_fim: str | None = None  # transferido | limite_ferramentas (ou o que quem usa definir)
+
+    def responder(self, texto_cliente: str) -> str:
+        """Entrega a fala do cliente e roda o agente até ele responder sem ferramenta. Devolve o que ele disse."""
+        if self.motivo_fim:
+            raise RuntimeError("atendimento encerrado")
+        entrada = [{"papel": "cliente", "texto": texto_cliente}]
+        if not self.eventos:
+            entrada.insert(0, {"papel": "contexto", "texto": contexto(self.c)})
+        self.eventos += entrada
+        for _ in range(self.max_rodadas):
+            turno = self.agente.passo(entrada)
+            self.eventos.append({"papel": "agente", "texto": turno["texto"], "chamadas": turno["chamadas"]})
+            if not turno["chamadas"]:
+                return turno["texto"]
+            entrada = [{"papel": "ferramenta", "id": ch["id"], "nome": ch["nome"],
+                        "resultado": self.sistema.executar(ch["nome"], ch["args"])} for ch in turno["chamadas"]]
+            self.eventos += entrada
+            if self.sistema.transferido:
+                # ponytail: um passo final para se despedir; chamadas nesse passo não são executadas
+                final = self.agente.passo(entrada)
+                self.eventos.append({"papel": "agente", "texto": final["texto"], "chamadas": final["chamadas"]})
+                self.motivo_fim = "transferido"
+                return final["texto"]
+        self.motivo_fim = "limite_ferramentas"
+        return ""
+
+    def conversa(self, motivo: str) -> Conversa:
+        return Conversa(self.c, self.eventos, self.sistema.estado_final(), self.sistema.bloqueios, motivo)
+
+
 def rodar(c: Cenario, agente: Agente, cliente: Cliente, max_falas: int = 8,
           max_rodadas_ferramenta: int = 6) -> Conversa:
-    sistema = Sistema(c)
+    s = Sessao(c, agente, max_rodadas_ferramenta)
     # Se o cliente simulado já encerrar na abertura, a conversa começa com um pedido genérico de ajuda.
-    fala = {"papel": "cliente", "texto": cliente.falar(None) or "Oi, preciso de ajuda com um pedido."}
-    eventos = [{"papel": "contexto", "texto": contexto(c)}, fala]
-    entrada, falas, rodadas = list(eventos), 1, 0
-
-    def fim(motivo):
-        return Conversa(c, eventos, sistema.estado_final(), sistema.bloqueios, motivo)
-
+    texto = cliente.falar(None) or "Oi, preciso de ajuda com um pedido."
+    falas = 1
     while True:
-        turno = agente.passo(entrada)
-        eventos.append({"papel": "agente", "texto": turno["texto"], "chamadas": turno["chamadas"]})
-        if turno["chamadas"]:
-            entrada = [{"papel": "ferramenta", "id": ch["id"], "nome": ch["nome"],
-                        "resultado": sistema.executar(ch["nome"], ch["args"])} for ch in turno["chamadas"]]
-            eventos += entrada
-            rodadas += 1
-            if sistema.transferido:
-                # ponytail: um passo final para se despedir; chamadas nesse passo não são executadas
-                final = agente.passo(entrada)
-                eventos.append({"papel": "agente", "texto": final["texto"], "chamadas": final["chamadas"]})
-                return fim("transferido")
-            if rodadas >= max_rodadas_ferramenta:
-                return fim("limite_ferramentas")
-            continue
-        rodadas = 0
+        resposta = s.responder(texto)
+        if s.motivo_fim:
+            return s.conversa(s.motivo_fim)
         if falas >= max_falas:
-            return fim("limite_turnos")
-        texto = cliente.falar(turno["texto"])
+            return s.conversa("limite_turnos")
+        texto = cliente.falar(resposta)
         if texto is None:
-            return fim("cliente_encerrou")
+            return s.conversa("cliente_encerrou")
         falas += 1
-        entrada = [{"papel": "cliente", "texto": texto}]
-        eventos += entrada

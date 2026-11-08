@@ -2,7 +2,7 @@ import itertools
 
 import pytest
 
-from conversa import Recusa, contexto, rodar
+from conversa import Recusa, Sessao, contexto, rodar
 from fabrica import cenario, entregue_com_atraso, pedido, antes
 
 
@@ -89,3 +89,26 @@ def test_abertura_vazia_vira_mensagem_padrao():
 def test_recusa_sobe():
     with pytest.raises(Recusa):
         rodar(C, AgenteRoteiro([Recusa("cyber")]), ClienteRoteiro(["oi"]))
+
+
+def test_sessao_uma_fala_por_vez():
+    s = Sessao(C, AgenteRoteiro([chamada("listar_pedidos"), texto("Achei.")]))
+    assert s.responder("cadê?") == "Achei."
+    assert [e["papel"] for e in s.eventos] == ["contexto", "cliente", "agente", "ferramenta", "agente"]
+    assert s.motivo_fim is None
+
+
+def test_sessao_trava_depois_de_transferir():
+    agente = AgenteRoteiro([chamada("transferir_para_humano", {"motivo": "pedido", "resumo": "quer humano"}),
+                            texto("Vou te passar para a equipe.")])
+    s = Sessao(cenario("humano", [entregue_com_atraso(0)]), agente)
+    assert s.responder("quero um humano") == "Vou te passar para a equipe."
+    assert s.motivo_fim == "transferido"
+    with pytest.raises(RuntimeError):
+        s.responder("alô?")
+
+
+def test_sessao_limite_de_ferramentas():
+    s = Sessao(C, AgenteRoteiro(chamada("listar_pedidos", id=f"t{i}") for i in itertools.count()))
+    assert s.responder("oi") == ""
+    assert s.motivo_fim == "limite_ferramentas"
